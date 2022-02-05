@@ -1,0 +1,142 @@
+openapi: "3.0.2"
+
+info:
+  title: "tagent"
+  description: "Lightweight web server providing APIs for basic file management tasks."
+  version: "1"
+  termsOfService: "https://github.com/joestubbs/tagent"
+  contact:
+    name: "fmgt"
+    url: "https://github.com/joestubbs/tagent"
+  license:
+    name: "BSD 3"
+    url: "https://github.com/joestubbs/tagent"
+
+servers:
+- url: http://localhost:8000
+  description: Local Development
+
+paths:
+  /status/ready:
+    get:
+      tags:
+        - All      
+        - Status
+      operationId: ready
+      description: Check whether the `tagent` server is ready.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BasicResponse'
+
+  /files/list/{path}:
+    get:
+      tags:
+        - Listing
+        - All
+      operationId: list_files
+      description: List the files at path `path` on the remote server.
+      parameters:
+      - name: path
+        in: path
+        description: Path on the server to a directory of file to list. Note that the `fmgt` server will prepend the configured `ROOT_DIR` path to the path provided in the request.
+        required: true
+        schema:
+          type: string      
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BasicResponse'
+                properties:
+                  result:
+                    $ref: '#/components/schemas/FilesListingResult'
+    
+  /files/contents/{path}:  
+    get:
+      tags:
+        - Contents
+        - All
+      operationId: download_file
+      description: Stream the contents of the file at path `path`.
+      parameters:
+      - name: path
+        in: path
+        description: Path on the server to a directory of files to list. Note that the `fmgt` server will prepend the configured `ROOT_DIR` path to the path provided in the request.
+        required: true    
+        schema:
+          type: string      
+      responses:
+        "200":
+          description: OK
+    post:
+      tags:
+        - Contents
+        - All
+      operationId: upload_file
+      description: Upload a file to the location `path` on the server.
+      parameters:
+      - name: path
+        in: path
+        description: Path on the server to a directory of file to list. Note that the `fmgt` server will prepend the configured `ROOT_DIR` path to the path provided in the request.
+        required: true
+        schema:
+          type: string      
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              required:
+              - file
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileStringResponse'          
+components:
+  schemas:
+    BasicResponse:
+      type: object
+      properties:
+        version:
+          type: string
+          description: Version of the server
+        message:
+          type: string
+          description: Brief description of the response
+        status:
+          type: string
+          description: Whether the request was a success or failure.
+          enum: [success, error]
+
+    FileStringResponse:
+      type: object
+      properties:
+        result:
+          type: string
+    
+    FilesListingResult:
+      type: object
+      properties:
+        result:
+          $ref: '#/components/schemas/arrayOfFiles'
+          
+    arrayOfFiles:
+      type: array
+      items: 
+        type: string
+
