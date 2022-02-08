@@ -86,7 +86,11 @@ pub async fn get_subject_of_request(req: dev::ServiceRequest,
                                     tenant_id: String) -> Result<String, String>{
 
     let headers = req.headers();
-    let token = get_header_value(&req, "x-tapis-token")?;
+    let token = get_header_value(&req, "x-tapis-token");
+    let token = match token {
+        Some(tok) => tok,
+        None => return Err("no tapis token header found".to_string())
+    };
     let url = format!("{}/v3/tenants/{}", base_url, tenant_id);
     let pub_key = fetch_publickey(&url).await;
     let pub_key = match pub_key {
