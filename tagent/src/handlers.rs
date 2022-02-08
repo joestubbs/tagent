@@ -1,20 +1,18 @@
-use std::path::PathBuf;
-use std::fs;
-use actix_web::{web, Either, Responder, Result, HttpResponse};
 use actix_files::NamedFile;
+use actix_web::{web, Either, HttpResponse, Responder, Result};
+use std::fs;
+use std::path::PathBuf;
 
-use async_std::prelude::*;
 use actix_multipart::Multipart;
+use async_std::prelude::*;
 use futures::{StreamExt, TryStreamExt};
 
-
-use super::representations::{AppState, FileListingRsp, FileUploadRsp, Ready, ErrorRsp};
-
+use super::representations::{AppState, ErrorRsp, FileListingRsp, FileUploadRsp, Ready};
 
 // status endpoints ---
 pub async fn ready(data: web::Data<AppState>) -> Result<impl Responder> {
     let version = &data.app_version;
-    let r = Ready{
+    let r = Ready {
         status: String::from("success"),
         message: String::from("tagent ready."),
         result: String::from("None"),
@@ -22,7 +20,6 @@ pub async fn ready(data: web::Data<AppState>) -> Result<impl Responder> {
     };
     Ok(web::Json(r))
 }
-
 
 // acls endpoints ---
 pub async fn get_all_acls() -> impl Responder {
@@ -41,8 +38,7 @@ pub async fn is_authz_service_user_path() -> impl Responder {
     format!("todo: is_authz_service_user_path")
 }
 
-
-// Utils 
+// Utils
 
 // Returns None if the input is not valid UTF-8.
 pub fn path_buf_to_str(input: &PathBuf) -> Option<&str> {
@@ -54,30 +50,30 @@ pub fn path_buf_to_string(input: PathBuf) -> Option<String> {
     input.as_path().to_str().map(|s| s.to_string())
 }
 
-
-
 // files endpoints ---
 
-pub fn get_local_listing(full_path: PathBuf) -> Vec<String>{
+pub fn get_local_listing(full_path: PathBuf) -> Vec<String> {
     let mut result: Vec<String> = Vec::new();
     // check if full_path is a directory
-    if !full_path.is_dir(){
+    if !full_path.is_dir() {
         // assume it is a single path and return it
         result.push(full_path.to_string_lossy().to_string());
         return result;
     }
     let paths = fs::read_dir(full_path).unwrap();
-    for path in paths {        
+    for path in paths {
         let s = path.unwrap().file_name().into_string(); // should be safe because we checked that full_path existed
         result.push(s.unwrap());
     }
     result
 }
 
-
 type FileListHttpRsp = Either<HttpResponse, web::Json<FileListingRsp>>;
 
-pub async fn list_files_path(data: web::Data<AppState>, params: web::Path<(String,)>) -> FileListHttpRsp{
+pub async fn list_files_path(
+    data: web::Data<AppState>,
+    params: web::Path<(String,)>,
+) -> FileListHttpRsp {
     let version = &data.app_version;
     let root_dir = &data.root_dir;
     let params = params.into_inner();
@@ -87,9 +83,12 @@ pub async fn list_files_path(data: web::Data<AppState>, params: web::Path<(Strin
     if !(path == String::from("/")) {
         full_path.push(path);
     }
-    if !full_path.exists(){
-        let message = String::from(format!("Invalid path; path {:?} does not exist", path_buf_to_str(&full_path)));
-        let r = ErrorRsp{
+    if !full_path.exists() {
+        let message = String::from(format!(
+            "Invalid path; path {:?} does not exist",
+            path_buf_to_str(&full_path)
+        ));
+        let r = ErrorRsp {
             status: String::from("error"),
             message: message,
             version: version.to_string(),
@@ -99,7 +98,7 @@ pub async fn list_files_path(data: web::Data<AppState>, params: web::Path<(Strin
     }
     let result = get_local_listing(full_path);
 
-    let r = FileListingRsp{
+    let r = FileListingRsp {
         status: String::from("success"),
         message: String::from("File listing retrieved successfully"),
         version: version.to_string(),
@@ -108,10 +107,12 @@ pub async fn list_files_path(data: web::Data<AppState>, params: web::Path<(Strin
     Either::B(web::Json(r))
 }
 
-
 type FileContentsHttpRsp = Either<HttpResponse, Result<NamedFile>>;
 
-pub async fn get_file_contents_path(data: web::Data<AppState>, params: web::Path<(String,)>) -> FileContentsHttpRsp{
+pub async fn get_file_contents_path(
+    data: web::Data<AppState>,
+    params: web::Path<(String,)>,
+) -> FileContentsHttpRsp {
     let version = &data.app_version;
     let root_dir = &data.root_dir;
     let params = params.into_inner();
@@ -120,16 +121,19 @@ pub async fn get_file_contents_path(data: web::Data<AppState>, params: web::Path
     let mut error: bool = false;
     let mut message = String::from("There was an error");
     full_path.push(path);
-    if !full_path.exists(){
-        message = String::from(format!("Invalid path; path {:?} does not exist", path_buf_to_str(&full_path)));
+    if !full_path.exists() {
+        message = String::from(format!(
+            "Invalid path; path {:?} does not exist",
+            path_buf_to_str(&full_path)
+        ));
         error = true;
     };
-    if full_path.is_dir(){
+    if full_path.is_dir() {
         message = String::from("Directory download is not supported");
         error = true;
     };
-    if error{
-        let r = ErrorRsp{
+    if error {
+        let r = ErrorRsp {
             status: String::from("error"),
             message: message,
             version: version.to_string(),
@@ -138,9 +142,7 @@ pub async fn get_file_contents_path(data: web::Data<AppState>, params: web::Path
         return Either::A(HttpResponse::BadRequest().json(r));
     }
     Either::B(Ok(NamedFile::open(full_path).unwrap()))
-    
 }
-
 
 pub async fn save_file(mut payload: Multipart, full_path: &String) -> Option<String> {
     let mut filepath = String::from("empty");
@@ -148,10 +150,14 @@ pub async fn save_file(mut payload: Multipart, full_path: &String) -> Option<Str
     while let Ok(Some(mut field)) = payload.try_next().await {
         // A multipart/form-data stream has to contain `content_disposition`
         let content_type = field
-            .content_disposition().ok_or(actix_web::error::ParseError::Incomplete).unwrap();
+            .content_disposition()
+            .ok_or(actix_web::error::ParseError::Incomplete)
+            .unwrap();
 
         let filename = content_type
-            .get_filename().ok_or(actix_web::error::ParseError::Incomplete).unwrap();
+            .get_filename()
+            .ok_or(actix_web::error::ParseError::Incomplete)
+            .unwrap();
         filepath = format!("{}/{}", full_path, filename);
 
         let mut f = async_std::fs::File::create(&filepath).await.unwrap();
@@ -164,15 +170,15 @@ pub async fn save_file(mut payload: Multipart, full_path: &String) -> Option<Str
     }
 
     Some(filepath)
-
 }
-
 
 type FileUploadHttpRsp = Either<HttpResponse, web::Json<FileUploadRsp>>;
 
-pub async fn post_file_contents_path(data: web::Data<AppState>, 
-                                     params: web::Path<(String,)>, 
-                                     payload: Multipart) -> FileUploadHttpRsp{    
+pub async fn post_file_contents_path(
+    data: web::Data<AppState>,
+    params: web::Path<(String,)>,
+    payload: Multipart,
+) -> FileUploadHttpRsp {
     let version = &data.app_version;
     let root_dir = &data.root_dir;
     let params = params.into_inner();
@@ -181,16 +187,22 @@ pub async fn post_file_contents_path(data: web::Data<AppState>,
     let mut error: bool = false;
     let mut message = String::from("There was an error");
     full_path.push(path);
-    if !full_path.exists(){
-        message = String::from(format!("Invalid path; path {:?} does not exist", path_buf_to_str(&full_path)));
+    if !full_path.exists() {
+        message = String::from(format!(
+            "Invalid path; path {:?} does not exist",
+            path_buf_to_str(&full_path)
+        ));
         error = true;
     };
-    if !full_path.is_dir(){
-        message = String::from(format!("Invalid path; path {:?} must be a directory", full_path));
+    if !full_path.is_dir() {
+        message = String::from(format!(
+            "Invalid path; path {:?} must be a directory",
+            full_path
+        ));
         error = true;
     };
-    if error{
-        let r = ErrorRsp{
+    if error {
+        let r = ErrorRsp {
             status: String::from("error"),
             message: message,
             version: version.to_string(),
@@ -200,14 +212,13 @@ pub async fn post_file_contents_path(data: web::Data<AppState>,
     };
     let full_path_s = path_buf_to_string(full_path).unwrap();
     let upload_path = save_file(payload, &full_path_s).await;
-    
-    let r = FileUploadRsp{
+
+    let r = FileUploadRsp {
         status: String::from("success"),
         message: format!("file uploaded to {:?} successfully.", upload_path),
         result: String::from("none"),
         version: version.to_string(),
     };
-    
+
     Either::B(web::Json(r))
-    
 }
