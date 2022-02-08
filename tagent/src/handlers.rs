@@ -1,3 +1,4 @@
+use log::{debug, error, info};
 use std::path::PathBuf;
 use std::fs;
 use actix_web::{web, Either, Responder, Result, HttpResponse};
@@ -13,6 +14,7 @@ use super::representations::{AppState, FileListingRsp, FileUploadRsp, Ready, Err
 
 // status endpoints ---
 pub async fn ready(data: web::Data<AppState>) -> Result<impl Responder> {
+    debug!("processing request to GET /status/ready");
     let version = &data.app_version;
     let r = Ready{
         status: String::from("success"),
@@ -82,6 +84,7 @@ pub async fn list_files_path(data: web::Data<AppState>, params: web::Path<(Strin
     let root_dir = &data.root_dir;
     let params = params.into_inner();
     let path = params.0;
+    debug!("processing request to GET /files/list/{}", path);
 
     let mut full_path = PathBuf::from(root_dir);
     if !(path == String::from("/")) {
