@@ -1,7 +1,7 @@
 use actix_files::NamedFile;
 use actix_web::{web, Either, HttpResponse, Responder, Result};
-use std::fs;
 use std::path::PathBuf;
+use std::{fs, path::Path};
 
 use actix_multipart::Multipart;
 use async_std::prelude::*;
@@ -23,26 +23,26 @@ pub async fn ready(data: web::Data<AppState>) -> Result<impl Responder> {
 
 // acls endpoints ---
 pub async fn get_all_acls() -> impl Responder {
-    format!("todo: get_all_acls")
+    "todo: get_all_acls".to_string()
 }
 
 pub async fn get_acls_for_service() -> impl Responder {
-    format!("todo: get_acls_for_service")
+    "todo: get_acls_for_service".to_string()
 }
 
 pub async fn get_acls_for_service_user() -> impl Responder {
-    format!("todo: get_acls_for_service_user")
+    "todo: get_acls_for_service_user".to_string()
 }
 
 pub async fn is_authz_service_user_path() -> impl Responder {
-    format!("todo: is_authz_service_user_path")
+    "todo: is_authz_service_user_path".to_string()
 }
 
 // Utils
 
 // Returns None if the input is not valid UTF-8.
-pub fn path_buf_to_str(input: &PathBuf) -> Option<&str> {
-    input.as_path().to_str()
+pub fn path_buf_to_str(input: &Path) -> Option<&str> {
+    input.to_str()
 }
 
 // Returns None if the input is not valid UTF-8.
@@ -80,17 +80,17 @@ pub async fn list_files_path(
     let path = params.0;
 
     let mut full_path = PathBuf::from(root_dir);
-    if !(path == String::from("/")) {
+    if path != "/" {
         full_path.push(path);
     }
     if !full_path.exists() {
-        let message = String::from(format!(
+        let message = format!(
             "Invalid path; path {:?} does not exist",
             path_buf_to_str(&full_path)
-        ));
+        );
         let r = ErrorRsp {
             status: String::from("error"),
-            message: message,
+            message,
             version: version.to_string(),
             result: String::from("none"),
         };
@@ -102,7 +102,7 @@ pub async fn list_files_path(
         status: String::from("success"),
         message: String::from("File listing retrieved successfully"),
         version: version.to_string(),
-        result: result,
+        result,
     };
     Either::B(web::Json(r))
 }
@@ -122,10 +122,10 @@ pub async fn get_file_contents_path(
     let mut message = String::from("There was an error");
     full_path.push(path);
     if !full_path.exists() {
-        message = String::from(format!(
+        message = format!(
             "Invalid path; path {:?} does not exist",
             path_buf_to_str(&full_path)
-        ));
+        );
         error = true;
     };
     if full_path.is_dir() {
@@ -135,7 +135,7 @@ pub async fn get_file_contents_path(
     if error {
         let r = ErrorRsp {
             status: String::from("error"),
-            message: message,
+            message,
             version: version.to_string(),
             result: String::from("none"),
         };
@@ -144,7 +144,7 @@ pub async fn get_file_contents_path(
     Either::B(Ok(NamedFile::open(full_path).unwrap()))
 }
 
-pub async fn save_file(mut payload: Multipart, full_path: &String) -> Option<String> {
+pub async fn save_file(mut payload: Multipart, full_path: &str) -> Option<String> {
     let mut filepath = String::from("empty");
     // iterate over multipart stream
     while let Ok(Some(mut field)) = payload.try_next().await {
@@ -188,23 +188,20 @@ pub async fn post_file_contents_path(
     let mut message = String::from("There was an error");
     full_path.push(path);
     if !full_path.exists() {
-        message = String::from(format!(
+        message = format!(
             "Invalid path; path {:?} does not exist",
             path_buf_to_str(&full_path)
-        ));
+        );
         error = true;
     };
     if !full_path.is_dir() {
-        message = String::from(format!(
-            "Invalid path; path {:?} must be a directory",
-            full_path
-        ));
+        message = format!("Invalid path; path {:?} must be a directory", full_path);
         error = true;
     };
     if error {
         let r = ErrorRsp {
             status: String::from("error"),
-            message: message,
+            message,
             version: version.to_string(),
             result: String::from("none"),
         };
