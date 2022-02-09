@@ -7,13 +7,13 @@ mod representations;
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_LOG", "actix_web=debug");
-
-    HttpServer::new(|| {
+    let root_dir = handlers::get_root_dir()?;
+    HttpServer::new(move || {
         App::new()
             .data(representations::AppState {
                 app_name: String::from("tagent"),
                 app_version: String::from("0.1.0"),
-                root_dir: String::from("/home/jstubbs/projects"),
+                root_dir: String::from(&root_dir),
             })
             .service(
                 //
