@@ -50,6 +50,26 @@ pub fn path_buf_to_string(input: PathBuf) -> Option<String> {
     input.as_path().to_str().map(|s| s.to_string())
 }
 
+fn path_to_string(input: &Path) -> std::io::Result<String> {
+    input.to_str().map(String::from).ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::Other, "Couldn't convert path to string")
+    })
+}
+
+pub(crate) fn get_root_dir() -> std::io::Result<String> {
+    std::env::var("TAGENT_HOME")
+        .or_else( |_| std::env::current_dir()
+            .and_then(std::fs::canonicalize)
+            .and_then(|x| path_to_string(&x)))
+        .or_else(|_| std::env::var("HOME"))
+        .map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Couldn't determine base directory.\nHelp: set the environment variable TAGENT_HOME.",
+            )
+        })
+}
+
 // files endpoints ---
 
 pub fn get_local_listing(full_path: PathBuf) -> Vec<String> {
@@ -218,4 +238,71 @@ pub async fn post_file_contents_path(
     };
 
     Either::B(web::Json(r))
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn path_to_string_should_work_on_ascii() -> std::io::Result<()> {
+        let s = path_to_string(&Path::new("/foo/bar"))?;
+        assert_eq!(s, "/foo/bar");
+        Ok(())
+    }
+
+    #[test]
+    fn path_to_string_should_work_on_unicode() -> std::io::Result<()> {
+        let s = path_to_string(&Path::new("/\u{2122}foo/bar"))?;
+        assert_eq!(s, "/\u{2122}foo/bar");
+        Ok(())
+    }
+
+    #[test]
+    fn get_root_dir_with_tagent_home_var() -> std::io::Result<()> {
+        std::env::set_var("TAGENT_HOME", "bar");
+        let r = get_root_dir()?;
+        assert_eq!(r, "bar");
+        Ok(())
+    }
+
+    #[test]
+    fn get_root_dir_with_current_dir() -> std::io::Result<()> {
+        let temp = tempfile::TempDir::new()?;
+        std::env::set_current_dir(&temp)?;
+        std::env::remove_var("TAGENT_HOME");
+        let r = get_root_dir()?;
+        assert_eq!(r, std::fs::canonicalize(temp)?.to_str().unwrap());
+        Ok(())
+    }
+
+    #[test]
+    fn get_root_dir_with_user_home() -> std::io::Result<()> {
+        std::env::remove_var("TAGENT_HOME");
+        {
+            let temp = tempfile::TempDir::new()?;
+            std::env::set_current_dir(temp)?;
+            // temp gets deleted when going out of scope, so
+            // current_dir becomes invalid
+        }
+        std::env::set_var("HOME", "baz");
+        let a = get_root_dir()?;
+        assert_eq!(a, "baz");
+        Ok(())
+    }
+
+    #[test]
+    fn get_root_dir_should_fail_if_no_vars_or_current_dir() -> std::io::Result<()> {
+        std::env::remove_var("TAGENT_HOME");
+        {
+            let temp = tempfile::TempDir::new()?;
+            std::env::set_current_dir(temp)?;
+            // temp gets deleted when going out of scope, so
+            // current_dir becomes invalid
+        }
+        std::env::remove_var("HOME");
+        let a = get_root_dir();
+        assert!(a.is_err());
+        Ok(())
+    }
 }
