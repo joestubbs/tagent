@@ -302,7 +302,6 @@ mod test {
         }
         std::env::remove_var("HOME");
         let a = get_root_dir();
-        dbg!(&a);
         assert!(a.is_err());
         Ok(())
     }
