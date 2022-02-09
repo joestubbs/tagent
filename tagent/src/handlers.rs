@@ -50,6 +50,26 @@ pub fn path_buf_to_string(input: PathBuf) -> Option<String> {
     input.as_path().to_str().map(|s| s.to_string())
 }
 
+fn path_to_string(input: &Path) -> std::io::Result<String> {
+    input.to_str().map(String::from).ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::Other, "Couldn't convert path to string")
+    })
+}
+
+pub(crate) fn get_root_dir() -> std::io::Result<String> {
+    std::env::var("TAGENT_HOME")
+        .or_else( |_| std::env::current_dir()
+            .and_then(std::fs::canonicalize)
+            .and_then(|x| path_to_string(&x)))
+        .or_else(|_| std::env::var("HOME"))
+        .map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Couldn't determine base directory.\nHelp: set the environment variable TAGENT_HOME.",
+            )
+        })
+}
+
 // files endpoints ---
 
 pub fn get_local_listing(full_path: PathBuf) -> Vec<String> {
