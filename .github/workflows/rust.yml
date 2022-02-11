@@ -17,6 +17,8 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Build
+      working-directory: ./tagent
       run: cargo build --verbose
     - name: Run tests
-      run: cargo test --verbose
+      working-directory: ./tagent
+      run: cargo test --verbose -- --test-threads=1
