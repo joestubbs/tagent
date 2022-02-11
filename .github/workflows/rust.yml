@@ -20,7 +20,8 @@ jobs:
       working-directory: ./tagent
       run: cargo fmt --check --verbose
     - name: Clippy
-      uses: actions-rs/clippy-check@v1.0.7
+      working-directory: ./tagent
+      run: cargo clippy --no-deps
     - name: Build
       working-directory: ./tagent
       run: cargo build --verbose
