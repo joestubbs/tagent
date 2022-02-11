@@ -16,6 +16,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Formatting
+      working-directory: ./tagent
+      run: cargo fmt --check --verbose
+    - name: Clippy
+      uses: actions-rs/clippy-check@v1.0.7
     - name: Build
       working-directory: ./tagent
       run: cargo build --verbose
