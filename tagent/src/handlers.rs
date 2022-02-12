@@ -17,14 +17,14 @@ use super::representations::{AppState, ErrorRsp, FileListingRsp, FileUploadRsp, 
 
 // status endpoints ---
 #[get("/status/ready")]
-pub async fn ready(app_version: web::Data<String>) -> Result<impl Responder> {
+pub async fn ready(app_state: web::Data<AppState>) -> Result<impl Responder> {
     debug!("processing request to GET /status/ready");
-    let version: String = app_version.get_ref().to_string();
+    let version= &app_state.get_ref().app_version;
     let r = Ready {
         status: String::from("success"),
         message: String::from("tagent ready."),
         result: String::from("None"),
-        version,
+        version: version.to_string(),
     };
     Ok(web::Json(r))
 }
@@ -204,7 +204,7 @@ pub async fn get_file_contents_path(
     _req: HttpRequest,
     app_version: web::Data<String>,
     root_dir: web::Data<String>,
-    params: web::Path<(String,)>,
+    params: web::Path<(PathBuf,)>,
 ) -> FileContentsHttpRsp {
     let version = app_version.get_ref().to_string();
     let root_dir = root_dir.get_ref().to_string();
@@ -217,7 +217,7 @@ pub async fn get_file_contents_path(
     if !full_path.exists() {
         message = format!(
             "Invalid path; path {:?} does not exist",
-            path_buf_to_str(&full_path)
+            &full_path
         );
         error = true;
     };
@@ -241,9 +241,8 @@ pub async fn get_file_contents_path(
     Ok(res)
 }
 
-pub async fn save_file(mut payload: Multipart, full_path: &str) -> Option<String> {
+pub async fn save_file(mut payload: Multipart, full_path: &str) -> std::io::Result<()> {
     // cf., https://github.com/actix/examples/blob/master/forms/multipart/src/main.rs#L8
-    let mut filepath = String::from("empty");
     // iterate over multipart stream
     while let Ok(Some(mut field)) = payload.try_next().await {
         // A multipart/form-data stream has to contain `content_disposition`
@@ -253,17 +252,17 @@ pub async fn save_file(mut payload: Multipart, full_path: &str) -> Option<String
             .get_filename()
             .map_or_else(|| Uuid::new_v4().to_string(), sanitize_filename::sanitize);
 
-        filepath = format!("{}/{}", full_path, filename);
+        let filepath = format!("{}/{}", full_path, filename);
 
-        let mut f = async_std::fs::File::create(&filepath).await.unwrap();
+        let mut f = async_std::fs::File::create(&filepath).await?;
 
         // Field in turn is stream of *Bytes* object
         while let Some(chunk) = field.next().await {
-            let data = chunk.unwrap();
-            f.write_all(&data).await.unwrap();
+            let data = chunk.map_err( |e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+            f.write_all(&data).await?;
         }
     }
-    Some(filepath)
+    Ok(())
 }
 
 type FileUploadHttpRsp = Either<HttpResponse, web::Json<FileUploadRsp>>;
