@@ -1,4 +1,7 @@
 # tagent
+
+![Lint, Test, and Build](../../actions/workflows/rust.yml/badge.svg)
+
 `tagent` (Tapis Agent) is a light-weight webserver, written in Rust, and built using the actix-web framework.
 `tagent` provides HTTP APIs for basic file management tasks. The server includes endpoints for listing file paths,
 uploading and downloading files.
