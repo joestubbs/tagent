@@ -322,14 +322,14 @@ mod test {
 
     #[test]
     fn path_to_string_should_work_on_ascii() -> std::io::Result<()> {
-        let s = path_to_string(&Path::new("/foo/bar"))?;
+        let s = path_to_string(Path::new("/foo/bar"))?;
         assert_eq!(s, "/foo/bar");
         Ok(())
     }
 
     #[test]
     fn path_to_string_should_work_on_unicode() -> std::io::Result<()> {
-        let s = path_to_string(&Path::new("/\u{2122}foo/bar"))?;
+        let s = path_to_string(Path::new("/\u{2122}foo/bar"))?;
         assert_eq!(s, "/\u{2122}foo/bar");
         Ok(())
     }
