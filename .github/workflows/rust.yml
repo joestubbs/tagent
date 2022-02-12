@@ -55,7 +55,7 @@ jobs:
         timeout-minutes: 30
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: --workspace --all-features --tests
+          args: --no-deps --workspace --all-features --tests
 
   test:
     name: Test
