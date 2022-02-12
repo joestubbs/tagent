@@ -115,13 +115,13 @@ pub async fn get_sub(req: HttpRequest, pub_key: String) -> Result<String, String
         }
     };
     match claims.subject {
-        Some(sub) => return Ok(sub),
+        Some(sub) => Ok(sub),
         None => {
             let msg = "token claims did not have a subject!".to_string();
             error!("{}", msg);
-            return Err(msg);
+            Err(msg)
         }
-    };
+    }
 }
 
 pub async fn get_subject_of_request(
@@ -168,11 +168,11 @@ pub async fn get_subject_of_request(
         }
     };
     match claims.subject {
-        Some(sub) => return Ok(sub),
+        Some(sub) => Ok(sub),
         None => {
             let msg = "token claims did not have a subject!".to_string();
             error!("{}", msg);
-            return Err(msg);
+            Err(msg)
         }
-    };
+    }
 }
