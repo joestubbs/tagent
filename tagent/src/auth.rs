@@ -30,6 +30,7 @@ struct Claims {
 // fetch the public key from a GET request to a uri.
 // In pratcice, uri will be the Tapis tenants API endpoint; e.g.,
 // uri = https://admin.tapis.io/v3/tenants/admin
+#[allow(dead_code)]
 async fn fetch_publickey(uri: &str) -> Result<String, String> {
     let res = reqwest::get(uri).await;
     let res = match res {
@@ -124,6 +125,7 @@ pub async fn get_sub(req: HttpRequest, pub_key: String) -> Result<String, String
     }
 }
 
+#[allow(dead_code)]
 pub async fn get_subject_of_request(
     req: HttpRequest,
     base_url: String,
