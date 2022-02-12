@@ -22,7 +22,6 @@ async fn main() -> std::io::Result<()> {
         pub_key,
     };
 
-    
     let actix_app_state = web::Data::new(app_state);
 
     HttpServer::new(move || {

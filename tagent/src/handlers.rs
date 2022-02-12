@@ -19,7 +19,7 @@ use super::representations::{AppState, ErrorRsp, FileListingRsp, FileUploadRsp, 
 #[get("/status/ready")]
 pub async fn ready(app_state: web::Data<AppState>) -> Result<impl Responder> {
     debug!("processing request to GET /status/ready");
-    let version= &app_state.get_ref().app_version;
+    let version = &app_state.get_ref().app_version;
     let r = Ready {
         status: String::from("success"),
         message: String::from("tagent ready."),
@@ -215,10 +215,7 @@ pub async fn get_file_contents_path(
     let mut message = String::from("There was an error");
     full_path.push(path);
     if !full_path.exists() {
-        message = format!(
-            "Invalid path; path {:?} does not exist",
-            &full_path
-        );
+        message = format!("Invalid path; path {:?} does not exist", &full_path);
         error = true;
     };
     if full_path.is_dir() {
@@ -258,7 +255,8 @@ pub async fn save_file(mut payload: Multipart, full_path: &str) -> std::io::Resu
 
         // Field in turn is stream of *Bytes* object
         while let Some(chunk) = field.next().await {
-            let data = chunk.map_err( |e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+            let data =
+                chunk.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
             f.write_all(&data).await?;
         }
     }
