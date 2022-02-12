@@ -1,4 +1,4 @@
-name: Rust
+name: Lint, Test, and Build
 
 on:
   push:
@@ -6,25 +6,56 @@ on:
   pull_request:
     branches: [ main ]
 
-env:
-  CARGO_TERM_COLOR: always
-
 jobs:
-  build:
-
+  fmt:
+    name: Formatting
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Formatting
-      working-directory: ./tagent
-      run: cargo fmt --check --verbose
-    - name: Clippy
-      working-directory: ./tagent
-      run: cargo clippy --no-deps
-    - name: Build
-      working-directory: ./tagent
-      run: cargo build --verbose
-    - name: Run tests
-      working-directory: ./tagent
-      run: cargo test --verbose -- --test-threads=1
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          components: rustfmt
+          override: true
+
+      - name: rustfmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: cache cargo artifacts
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ./target/debug
+          key: cargo-clippy-${{ matrix.version }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-clippy-${{ matrix.version }}-
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          components: clippy
+          override: true
+
+      - name: clippy
+        uses: actions-rs/clippy-check@v1
+        timeout-minutes: 30
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --workspace --all-features --tests
+
