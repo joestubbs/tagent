@@ -1,6 +1,6 @@
 use actix_files::NamedFile;
 use actix_web::{
-    get, post, web, Either, Error, HttpRequest, HttpResponse, Responder, ResponseError, Result,
+    get, post, web, Either, HttpRequest, HttpResponse, Responder, ResponseError, Result,
 };
 use log::{debug, info};
 use std::fmt;
@@ -191,13 +191,12 @@ impl ResponseError for TagentError {
     }
 }
 
-pub fn make_tagent_error(message: String, version: String) -> Result<(), TagentError> {
-    let r = TagentError { message, version };
-    Err(r)
+pub fn make_tagent_error(message: String, version: String) -> TagentError {
+    TagentError { message, version }
 }
 
 // type FileContentsHttpRsp = Either<HttpResponse, Result<NamedFile>>;
-type FileContentsHttpRsp = Result<HttpResponse, Error>;
+type FileContentsHttpRsp = Result<HttpResponse, TagentError>;
 
 #[get("/files/contents/{path:.*}")]
 pub async fn get_file_contents_path(
@@ -226,17 +225,17 @@ pub async fn get_file_contents_path(
         error = true;
     };
     if error {
-        make_tagent_error(message, version)?;
+        return Err(make_tagent_error(message, version));
     }
     //this line compiles but doesn't allow for a custom error
-    let fbody = NamedFile::open(full_path)?;
-    // let fbody = match fbody {
-    //     Ok(f) => f,
-    //     Err(e) => {
-    //         let msg = format!("Got error trying to open file; details: {}", e);
-    //         let er = make_tagent_error(msg, version.to_string())?;
-    //     },
-    // };
+    let fbody = NamedFile::open(full_path);
+    let fbody = match fbody {
+        Ok(f) => f,
+        Err(e) => {
+            let msg = format!("Got error trying to open file; details: {}", e);
+            return Err(make_tagent_error(msg, version.to_string()));
+        },
+    };
     let res = fbody.into_response(&_req);
     Ok(res)
 }
