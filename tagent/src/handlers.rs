@@ -1,44 +1,55 @@
-use log::{debug, error, info};
+use log::{debug, info};
 use std::path::PathBuf;
 use std::fs;
-use actix_web::{web, Either, Responder, Result, HttpResponse};
+use std::fmt;
+use actix_web::{web, get, post, Either, Error, Responder, Result, HttpRequest, HttpResponse, ResponseError};
 use actix_files::NamedFile;
 
+use serde_json;
 use async_std::prelude::*;
 use actix_multipart::Multipart;
 use futures::{StreamExt, TryStreamExt};
-
+use uuid::Uuid;
 
 use super::representations::{AppState, FileListingRsp, FileUploadRsp, Ready, ErrorRsp};
+use super::auth::{get_subject_of_request, get_sub};
 
 
 // status endpoints ---
-pub async fn ready(data: web::Data<AppState>) -> Result<impl Responder> {
+#[get("/status/ready")]
+pub async fn ready(app_version: web::Data<String>) -> Result<impl Responder> {
     debug!("processing request to GET /status/ready");
-    let version = &data.app_version;
+    let version: String = app_version.get_ref().to_string();
     let r = Ready{
         status: String::from("success"),
         message: String::from("tagent ready."),
         result: String::from("None"),
-        version: version.to_string(),
+        version: version,
     };
     Ok(web::Json(r))
 }
 
 
 // acls endpoints ---
+#[get("/acls/all")]
 pub async fn get_all_acls() -> impl Responder {
     format!("todo: get_all_acls")
 }
 
+
+#[get("/acls/{service}")]
 pub async fn get_acls_for_service() -> impl Responder {
     format!("todo: get_acls_for_service")
 }
 
+
+#[get("/acls/{service}/{user}")]
 pub async fn get_acls_for_service_user() -> impl Responder {
     format!("todo: get_acls_for_service_user")
 }
 
+
+#[get("/acls/isauthz/{service}/{user}/{path:.*}")]
 pub async fn is_authz_service_user_path() -> impl Responder {
     format!("todo: is_authz_service_user_path")
 }
@@ -79,13 +90,36 @@ pub fn get_local_listing(full_path: PathBuf) -> Vec<String>{
 
 type FileListHttpRsp = Either<HttpResponse, web::Json<FileListingRsp>>;
 
-pub async fn list_files_path(data: web::Data<AppState>, params: web::Path<(String,)>) -> FileListHttpRsp{
-    let version = &data.app_version;
-    let root_dir = &data.root_dir;
+#[get("/files/list/{path:.*}")]
+pub async fn list_files_path(_req: HttpRequest, 
+    app_state: web::Data<AppState>,
+    params: web::Path<(String,)>) 
+    -> FileListHttpRsp{
+
+    let version = &app_state.get_ref().app_version;
+    let root_dir = &app_state.get_ref().root_dir;
+    let pub_key = &app_state.get_ref().pub_key;
     let params = params.into_inner();
     let path = params.0;
     debug!("processing request to GET /files/list/{}", path);
-
+    debug!("version: {}; root_dir: {}'; pub: {}", version, root_dir, pub_key);
+    let subject = get_sub(_req, pub_key.to_string()).await;
+    let subject = match subject {
+        Ok(sub) => sub,
+        Err(error) => {
+            let msg = format!("got an error from get_subject_of_request; error: {}", error);
+            info!("{}", msg);
+            let r = ErrorRsp{
+                status: String::from("error"),
+                message: msg,
+                version: version.to_string(),
+                result: String::from("none"),
+            };
+            return Either::Left(HttpResponse::BadRequest().json(r));
+        }
+    };
+    info!("parsed jwt; subject: {}", subject);
+    
     let mut full_path = PathBuf::from(root_dir);
     if !(path == String::from("/")) {
         full_path.push(path);
@@ -98,7 +132,7 @@ pub async fn list_files_path(data: web::Data<AppState>, params: web::Path<(Strin
             version: version.to_string(),
             result: String::from("none"),
         };
-        return Either::A(HttpResponse::BadRequest().json(r));
+        return Either::Left(HttpResponse::BadRequest().json(r));
     }
     let result = get_local_listing(full_path);
 
@@ -108,15 +142,58 @@ pub async fn list_files_path(data: web::Data<AppState>, params: web::Path<(Strin
         version: version.to_string(),
         result: result,
     };
-    Either::B(web::Json(r))
+    Either::Right(web::Json(r))
 }
 
 
-type FileContentsHttpRsp = Either<HttpResponse, Result<NamedFile>>;
+// The Error type that can convert to a actix_web::HttpResponse
+#[derive(Debug)]
+pub struct TagentError {
+    message: String,
+    version: String,
+}
 
-pub async fn get_file_contents_path(data: web::Data<AppState>, params: web::Path<(String,)>) -> FileContentsHttpRsp{
-    let version = &data.app_version;
-    let root_dir = &data.root_dir;
+impl fmt::Display for TagentError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Error: {}", self.message)
+    }    
+}
+
+impl ResponseError for TagentError{
+    fn error_response(&self) -> HttpResponse {
+        let m = &self.message;
+        let v = &self.version;
+        let r = ErrorRsp{
+            status: String::from("error"),
+            message: m.to_string(),
+            version: v.to_string(),
+            result: String::from("none"),
+        };
+        let body = serde_json::to_value(&r).unwrap().to_string();
+        HttpResponse::BadRequest().body(body)
+    }
+}
+
+
+pub fn make_tagent_error(message: String, version: String) -> Result<(), TagentError> {
+    let r = TagentError{
+        message: message,
+        version: version.to_string(),
+    };
+    return Err(r)
+}
+
+// type FileContentsHttpRsp = Either<HttpResponse, Result<NamedFile>>;
+type FileContentsHttpRsp = Result<HttpResponse, Error>;
+
+#[get("/files/contents/{path:.*}")]
+pub async fn get_file_contents_path(_req: HttpRequest, 
+    app_version: web::Data<String>, 
+    root_dir: web::Data<String>, 
+    params: web::Path<(String,)>) -> FileContentsHttpRsp{
+ 
+    let version  = app_version.get_ref().to_string();
+    let root_dir = root_dir.get_ref().to_string();
     let params = params.into_inner();
     let path = params.0;
     let mut full_path = PathBuf::from(root_dir);
@@ -132,29 +209,33 @@ pub async fn get_file_contents_path(data: web::Data<AppState>, params: web::Path
         error = true;
     };
     if error{
-        let r = ErrorRsp{
-            status: String::from("error"),
-            message: message,
-            version: version.to_string(),
-            result: String::from("none"),
-        };
-        return Either::A(HttpResponse::BadRequest().json(r));
+        make_tagent_error(message, version.to_string())?;
     }
-    Either::B(Ok(NamedFile::open(full_path).unwrap()))
-    
+    //this line compiles but doesn't allow for a custom error
+    let fbody = NamedFile::open(full_path)?;
+    // let fbody = match fbody {
+    //     Ok(f) => f,
+    //     Err(e) => {
+    //         let msg = format!("Got error trying to open file; details: {}", e);
+    //         let er = make_tagent_error(msg, version.to_string())?;
+    //     },
+    // };
+    let res = fbody.into_response(&_req);
+    Ok(res)
 }
 
-
 pub async fn save_file(mut payload: Multipart, full_path: &String) -> Option<String> {
+    // cf., https://github.com/actix/examples/blob/master/forms/multipart/src/main.rs#L8
     let mut filepath = String::from("empty");
     // iterate over multipart stream
     while let Ok(Some(mut field)) = payload.try_next().await {
         // A multipart/form-data stream has to contain `content_disposition`
-        let content_type = field
-            .content_disposition().ok_or(actix_web::error::ParseError::Incomplete).unwrap();
+        let content_disposition = field.content_disposition();
 
-        let filename = content_type
-            .get_filename().ok_or(actix_web::error::ParseError::Incomplete).unwrap();
+        let filename = content_disposition
+            .get_filename()
+            .map_or_else(|| Uuid::new_v4().to_string(), sanitize_filename::sanitize);
+
         filepath = format!("{}/{}", full_path, filename);
 
         let mut f = async_std::fs::File::create(&filepath).await.unwrap();
@@ -165,19 +246,20 @@ pub async fn save_file(mut payload: Multipart, full_path: &String) -> Option<Str
             f.write_all(&data).await.unwrap();
         }
     }
-
     Some(filepath)
-
 }
 
 
 type FileUploadHttpRsp = Either<HttpResponse, web::Json<FileUploadRsp>>;
 
-pub async fn post_file_contents_path(data: web::Data<AppState>, 
-                                     params: web::Path<(String,)>, 
-                                     payload: Multipart) -> FileUploadHttpRsp{    
-    let version = &data.app_version;
-    let root_dir = &data.root_dir;
+#[post("/files/contents/{path:.*}")]
+pub async fn post_file_contents_path(app_version: web::Data<String>, 
+    root_dir: web::Data<String>,
+    params: web::Path<(String,)>, 
+    payload: Multipart) -> FileUploadHttpRsp{    
+
+    let version  = app_version.get_ref().to_string();
+    let root_dir = root_dir.get_ref().to_string();    
     let params = params.into_inner();
     let path = params.0;
     let mut full_path = PathBuf::from(root_dir);
@@ -199,7 +281,7 @@ pub async fn post_file_contents_path(data: web::Data<AppState>,
             version: version.to_string(),
             result: String::from("none"),
         };
-        return Either::A(HttpResponse::BadRequest().json(r));
+        return Either::Left(HttpResponse::BadRequest().json(r));
     };
     let full_path_s = path_buf_to_string(full_path).unwrap();
     let upload_path = save_file(payload, &full_path_s).await;
@@ -211,6 +293,6 @@ pub async fn post_file_contents_path(data: web::Data<AppState>,
         version: version.to_string(),
     };
     
-    Either::B(web::Json(r))
+    Either::Right(web::Json(r))
     
 }

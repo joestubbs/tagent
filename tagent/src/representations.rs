@@ -1,11 +1,10 @@
 use serde::Serialize;
 
 
-// Application state shared across threads
 pub struct AppState {
-    pub app_name: String,
     pub app_version: String,
     pub root_dir: String,
+    pub pub_key: String
 }
 
 
