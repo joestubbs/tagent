@@ -315,6 +315,11 @@ pub async fn post_file_contents_path(
 
 #[cfg(test)]
 mod test {
+    use actix_web::App;
+    use reqwest::StatusCode;
+
+    use crate::make_config;
+
     use super::*;
 
     #[test]
@@ -376,6 +381,26 @@ mod test {
         std::env::remove_var("HOME");
         let a = get_root_dir();
         assert!(a.is_err());
+        Ok(())
+    }
+
+    #[actix_rt::test]
+    async fn status_should_be_ready() -> std::io::Result<()> {
+        let app_state = AppState {
+            app_version: String::from("0.1.0"),
+            root_dir: String::from(""),
+            pub_key: String::from(""),
+        };
+        let mut app = actix_web::test::init_service(
+            App::new().configure(make_config(web::Data::new(app_state))),
+        )
+        .await;
+        let req = actix_web::test::TestRequest::get()
+            .uri("/status/ready")
+            .to_request();
+        let resp =
+            actix_web::test::call_service(&mut app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
         Ok(())
     }
 }
