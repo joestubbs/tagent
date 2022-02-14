@@ -1,6 +1,5 @@
-use serde::Serialize;
 use jwt_simple::algorithms::RS256PublicKey;
-
+use serde::Serialize;
 
 pub struct AppState {
     pub app_version: String,

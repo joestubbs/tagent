@@ -1,7 +1,6 @@
-use log::{info, error};
 use jwt_simple::algorithms::RS256PublicKey;
+use log::{error, info};
 use serde::{Deserialize, Serialize};
-
 
 // Tapis Tenants API response structs ---
 
@@ -15,7 +14,6 @@ struct TapisTenantsResult {
 struct TenantsAPIResponse {
     result: TapisTenantsResult,
 }
-
 
 // fetch the public key from a GET request to a uri.
 // In pratcice, uri will be the Tapis tenants API endpoint; e.g.,
@@ -67,8 +65,7 @@ async fn fetch_publickey(uri: &str) -> Result<String, String> {
     }
 }
 
-
-// Fetch the public key to use for signature verifaction from the Tenants API, 
+// Fetch the public key to use for signature verifaction from the Tenants API,
 // by using the URL defined in the TAGENT_PUB_KEY_URL variable.
 async fn fetch_pub_key_str_from_vars() -> std::io::Result<String> {
     let pub_key_url = std::env::var("TAGENT_PUB_KEY_URL");
@@ -84,7 +81,10 @@ async fn fetch_pub_key_str_from_vars() -> std::io::Result<String> {
     let pub_key = match pub_key {
         Ok(p) => p,
         Err(e) => {
-            let msg = format!("Got error trying to fetch the public key from URL: {}; details: {}", pub_key_url, e);
+            let msg = format!(
+                "Got error trying to fetch the public key from URL: {}; details: {}",
+                pub_key_url, e
+            );
             error!("{}", msg);
             return Err(std::io::Error::new(std::io::ErrorKind::Other, msg));
         }
@@ -92,10 +92,9 @@ async fn fetch_pub_key_str_from_vars() -> std::io::Result<String> {
     Ok(pub_key)
 }
 
-
-// Checks for the presence of envrionment variables to determine whether to retrieve the public key from the 
-// Tapis Tenants API or to get the public key from the environment. 
-async fn get_public_key_str() -> std::io::Result<String> {    
+// Checks for the presence of envrionment variables to determine whether to retrieve the public key from the
+// Tapis Tenants API or to get the public key from the environment.
+async fn get_public_key_str() -> std::io::Result<String> {
     // if a public key is passed in directly as an environment variable, use that
     let pub_key_str = std::env::var("TAGENT_PUB_KEY");
     match pub_key_str {
@@ -107,19 +106,18 @@ async fn get_public_key_str() -> std::io::Result<String> {
     }
 }
 
-
 // RSA256 PEM PKS#8 format requires line breaks at the 64 character mark;
 // cf., https://www.rfc-editor.org/rfc/rfc1421, section 4.3.2.4  Step 4: Printable Encoding
-//     "...with each line except the last containing exactly 64 printable characters and the final line containing 
+//     "...with each line except the last containing exactly 64 printable characters and the final line containing
 //      64 or fewer printable characters."
-// This function adds the necessary line breaks 
+// This function adds the necessary line breaks
 fn insert_line_breaks_pub_key(pub_key: String) -> std::io::Result<String> {
     let mut result = pub_key;
     // first location of a required newline
     let mut idx = 26;
-    while  idx < result.len() {
+    while idx < result.len() {
         // get the character at the next endline position, bubble up None
-        let t  = result.get(idx..idx+1);
+        let t = result.get(idx..idx + 1);
         let t = match t {
             Some(t) => t,
             _ => {
@@ -129,14 +127,12 @@ fn insert_line_breaks_pub_key(pub_key: String) -> std::io::Result<String> {
             }
         };
         if t != "\n" {
-            result.insert(idx, '\n');    
+            result.insert(idx, '\n');
         };
         idx += 65;
-            
     }
     Ok(result)
 }
-
 
 // Public function for calculating the public key to use for signature verification.
 pub async fn get_pub_key() -> std::io::Result<RS256PublicKey> {
@@ -155,5 +151,4 @@ pub async fn get_pub_key() -> std::io::Result<RS256PublicKey> {
         }
     };
     Ok(rsa_pub_key)
-
 }
