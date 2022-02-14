@@ -410,14 +410,14 @@ mod test {
             root_dir: String::from(""),
             pub_key: String::from(""),
         };
-        let mut app = actix_web::test::init_service(
+        let app = actix_web::test::init_service(
             App::new().configure(make_config(web::Data::new(app_state))),
         )
         .await;
         let req = actix_web::test::TestRequest::get()
             .uri("/status/ready")
             .to_request();
-        let resp = actix_web::test::call_service(&mut app, req).await;
+        let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
         Ok(())
     }
