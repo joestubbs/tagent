@@ -1,9 +1,11 @@
 use serde::Serialize;
+use jwt_simple::algorithms::RS256PublicKey;
+
 
 pub struct AppState {
     pub app_version: String,
     pub root_dir: String,
-    pub pub_key: String,
+    pub pub_key: RS256PublicKey,
 }
 
 #[derive(Serialize)]

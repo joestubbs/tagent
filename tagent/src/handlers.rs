@@ -2,7 +2,7 @@ use actix_files::NamedFile;
 use actix_web::{
     get, post, web, Either, Error, HttpRequest, HttpResponse, Responder, ResponseError, Result,
 };
-use log::{debug, info};
+use log::{debug, info, warn};
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -12,7 +12,7 @@ use async_std::prelude::*;
 use futures::{StreamExt, TryStreamExt};
 use uuid::Uuid;
 
-use super::auth::get_sub;
+use super::auth::get_subject_of_request;
 use super::representations::{AppState, ErrorRsp, FileListingRsp, FileUploadRsp, Ready};
 
 // status endpoints ---
@@ -70,10 +70,10 @@ fn path_to_string(input: &Path) -> std::io::Result<String> {
 
 pub(crate) fn get_root_dir() -> std::io::Result<String> {
     std::env::var("TAGENT_HOME")
-        .or_else( |_| std::env::current_dir()
+        .or_else( |_| {warn!("TAGENT_HOME not set; using current working directory!"); std::env::current_dir()}
             .and_then(std::fs::canonicalize)
             .and_then(|x| path_to_string(&x)))
-        .or_else(|_| std::env::var("HOME"))
+        .or_else(|_| {warn!("Couldn't use the curent working directory; defaulting to $HOME!"); std::env::var("HOME")} )
         .map_err(|_| {
             std::io::Error::new(
                 std::io::ErrorKind::Other,
@@ -114,11 +114,7 @@ pub async fn list_files_path(
     let params = params.into_inner();
     let path = params.0;
     debug!("processing request to GET /files/list/{}", path);
-    debug!(
-        "version: {}; root_dir: {}'; pub: {}",
-        version, root_dir, pub_key
-    );
-    let subject = get_sub(_req, pub_key.to_string()).await;
+    let subject = get_subject_of_request(_req, pub_key).await;
     let subject = match subject {
         Ok(sub) => sub,
         Err(error) => {
