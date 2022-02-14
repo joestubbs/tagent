@@ -2,7 +2,7 @@ use actix_web::HttpRequest;
 use jwt_simple::algorithms::RS256PublicKey;
 use jwt_simple::claims::NoCustomClaims;
 use jwt_simple::prelude::*;
-use log::{debug, error, info};
+use log::{debug, error};
 use serde::{Deserialize, Serialize};
 
 

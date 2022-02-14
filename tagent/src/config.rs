@@ -114,7 +114,7 @@ async fn get_public_key_str() -> std::io::Result<String> {
 //      64 or fewer printable characters."
 // This function adds the necessary line breaks 
 fn insert_line_breaks_pub_key(pub_key: String) -> std::io::Result<String> {
-    let mut result = pub_key.clone();
+    let mut result = pub_key;
     // first location of a required newline
     let mut idx = 26;
     while  idx < result.len() {
