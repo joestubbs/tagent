@@ -8,9 +8,7 @@ mod handlers;
 mod models;
 mod representations;
 
-fn make_config(
-    app_data: web::Data<representations::AppState>,
-) -> impl FnOnce(&mut ServiceConfig) {
+fn make_config(app_data: web::Data<representations::AppState>) -> impl FnOnce(&mut ServiceConfig) {
     |cfg: &mut ServiceConfig| {
         cfg.app_data(app_data).service(
             //
