@@ -79,11 +79,17 @@ async fn fetch_publickey(uri: &str) -> Result<String, String> {
 
 //get the value of a header_name from a request
 // cf., https://stackoverflow.com/questions/52919494/is-there-simpler-method-to-get-the-string-value-of-an-actix-web-http-header
-fn get_header_value<'a>(req: &'a HttpRequest, header_name: &str) -> Option<&'a str> {
+fn get_header_value<'a>(
+    req: &'a HttpRequest,
+    header_name: &str,
+) -> Option<&'a str> {
     req.headers().get(header_name)?.to_str().ok()
 }
 
-pub async fn get_sub(req: HttpRequest, pub_key: String) -> Result<String, String> {
+pub async fn get_sub(
+    req: HttpRequest,
+    pub_key: String,
+) -> Result<String, String> {
     debug!("top of get_sub");
     let token = get_header_value(&req, "x-tapis-token");
     debug!("returned from get_header_value..");

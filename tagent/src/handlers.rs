@@ -1,6 +1,7 @@
 use actix_files::NamedFile;
 use actix_web::{
-    get, post, web, Either, Error, HttpRequest, HttpResponse, Responder, ResponseError, Result,
+    get, post, web, Either, Error, HttpRequest, HttpResponse, Responder,
+    ResponseError, Result,
 };
 use log::{debug, info};
 use std::fmt;
@@ -13,7 +14,9 @@ use futures::{StreamExt, TryStreamExt};
 use uuid::Uuid;
 
 use super::auth::get_sub;
-use super::representations::{AppState, ErrorRsp, FileListingRsp, FileUploadRsp, Ready};
+use super::representations::{
+    AppState, ErrorRsp, FileListingRsp, FileUploadRsp, Ready,
+};
 
 // status endpoints ---
 #[get("/status/ready")]
@@ -64,7 +67,10 @@ pub fn path_buf_to_string(input: PathBuf) -> Option<String> {
 
 fn path_to_string(input: &Path) -> std::io::Result<String> {
     input.to_str().map(String::from).ok_or_else(|| {
-        std::io::Error::new(std::io::ErrorKind::Other, "Couldn't convert path to string")
+        std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Couldn't convert path to string",
+        )
     })
 }
 
@@ -122,7 +128,10 @@ pub async fn list_files_path(
     let subject = match subject {
         Ok(sub) => sub,
         Err(error) => {
-            let msg = format!("got an error from get_subject_of_request; error: {}", error);
+            let msg = format!(
+                "got an error from get_subject_of_request; error: {}",
+                error
+            );
             info!("{}", msg);
             let r = ErrorRsp {
                 status: String::from("error"),
@@ -191,7 +200,10 @@ impl ResponseError for TagentError {
     }
 }
 
-pub fn make_tagent_error(message: String, version: String) -> Result<(), TagentError> {
+pub fn make_tagent_error(
+    message: String,
+    version: String,
+) -> Result<(), TagentError> {
     let r = TagentError { message, version };
     Err(r)
 }
@@ -238,16 +250,20 @@ pub async fn get_file_contents_path(
     Ok(res)
 }
 
-pub async fn save_file(mut payload: Multipart, full_path: &str) -> std::io::Result<()> {
+pub async fn save_file(
+    mut payload: Multipart,
+    full_path: &str,
+) -> std::io::Result<()> {
     // cf., https://github.com/actix/examples/blob/master/forms/multipart/src/main.rs#L8
     // iterate over multipart stream
     while let Ok(Some(mut field)) = payload.try_next().await {
         // A multipart/form-data stream has to contain `content_disposition`
         let content_disposition = field.content_disposition();
 
-        let filename = content_disposition
-            .get_filename()
-            .map_or_else(|| Uuid::new_v4().to_string(), sanitize_filename::sanitize);
+        let filename = content_disposition.get_filename().map_or_else(
+            || Uuid::new_v4().to_string(),
+            sanitize_filename::sanitize,
+        );
 
         let filepath = format!("{}/{}", full_path, filename);
 
@@ -255,8 +271,9 @@ pub async fn save_file(mut payload: Multipart, full_path: &str) -> std::io::Resu
 
         // Field in turn is stream of *Bytes* object
         while let Some(chunk) = field.next().await {
-            let data =
-                chunk.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+            let data = chunk.map_err(|e| {
+                std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
+            })?;
             f.write_all(&data).await?;
         }
     }
@@ -288,7 +305,8 @@ pub async fn post_file_contents_path(
         error = true;
     };
     if !full_path.is_dir() {
-        message = format!("Invalid path; path {:?} must be a directory", full_path);
+        message =
+            format!("Invalid path; path {:?} must be a directory", full_path);
         error = true;
     };
     if error {
@@ -370,7 +388,8 @@ mod test {
     }
 
     #[test]
-    fn get_root_dir_should_fail_if_no_vars_or_current_dir() -> std::io::Result<()> {
+    fn get_root_dir_should_fail_if_no_vars_or_current_dir(
+    ) -> std::io::Result<()> {
         std::env::remove_var("TAGENT_HOME");
         {
             let temp = tempfile::TempDir::new()?;
