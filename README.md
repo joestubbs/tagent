@@ -9,8 +9,15 @@ uploading and downloading files.
 An OpenAPI v3 specification is included.
 
 ## Building the Project
-The project requires a recent version of Rust (e.g., 1.57.0); install using `rustup`. With rust
-installed, use `cargo` to build the project:
+The project requires a recent version of Rust (e.g., 1.57.0); install using `rustup`. 
+You also need OpenSSL (both the library and headers) required for building the rust-openssl
+lib. (See https://docs.rs/crate/openssl-sys/0.9.36). On Debian/Ubuntu, you can install with
+
+```
+$ sudo apt-get install pkg-config libssl-dev
+```
+
+With rust and the pre-requisites installed, use `cargo` to build the project:
 
 ```
 $ cargo build
