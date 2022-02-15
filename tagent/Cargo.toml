@@ -23,4 +23,6 @@ uuid = { version = "0.8", features = ["v4"] }
 rsa = "0.5.0"
 tempfile = "3.3.0"
 
+[dev-dependencies]
+actix-rt = "2.6.0"
 

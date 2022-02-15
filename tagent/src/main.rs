@@ -1,4 +1,5 @@
 use actix_web::middleware::Logger;
+use actix_web::web::ServiceConfig;
 use actix_web::{web, App, HttpServer};
 use dotenv::dotenv;
 
@@ -7,6 +8,26 @@ mod config;
 mod handlers;
 mod models;
 mod representations;
+
+fn make_config(app_data: web::Data<representations::AppState>) -> impl FnOnce(&mut ServiceConfig) {
+    |cfg: &mut ServiceConfig| {
+        cfg.app_data(app_data).service(
+            //
+            web::scope("")
+                // status routes ----
+                .service(handlers::ready)
+                // acls routes ----
+                .service(handlers::get_all_acls)
+                .service(handlers::get_acls_for_service)
+                .service(handlers::get_acls_for_service_user)
+                .service(handlers::is_authz_service_user_path)
+                // files routes ----
+                .service(handlers::list_files_path)
+                .service(handlers::get_file_contents_path)
+                .service(handlers::post_file_contents_path),
+        );
+    }
+}
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -31,24 +52,7 @@ async fn main() -> std::io::Result<()> {
             // set up application logging
             .wrap(Logger::default())
             .wrap(Logger::new("%a %{User-Agent}i"))
-            // declare app state
-            .app_data(actix_app_state.clone())
-            // declare routes
-            .service(
-                //
-                web::scope("")
-                    // status routes ----
-                    .service(handlers::ready)
-                    // acls routes ----
-                    .service(handlers::get_all_acls)
-                    .service(handlers::get_acls_for_service)
-                    .service(handlers::get_acls_for_service_user)
-                    .service(handlers::is_authz_service_user_path)
-                    // files routes ----
-                    .service(handlers::list_files_path)
-                    .service(handlers::get_file_contents_path)
-                    .service(handlers::post_file_contents_path),
-            )
+            .configure(make_config(actix_app_state.clone()))
     })
     .bind("127.0.0.1:8080")?
     .run()
