@@ -151,3 +151,41 @@ pub async fn get_pub_key() -> std::io::Result<RS256PublicKey> {
     };
     Ok(rsa_pub_key)
 }
+
+
+#[cfg(test)]
+mod test {
+    use actix_web::App;
+    use reqwest::StatusCode;
+
+    use crate::make_config;
+
+    use super::*;
+
+    #[actix_rt::test]
+    async fn get_pub_key_with_key_var() -> std::io::Result<()> {
+        std::env::set_var("TAGENT_PUB_KEY", "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAneCSAKpfuRxX7DpuBBoYEhIayF6yGppgR3I6jO1cvN0+6gc36wHo3O93bnfNl2cYSmbpp9dtd1T2Uv1t5DCGe+s2bd/VwfO6IgMu2GuHHkQcTqTJb0axIJftqo5lfopSOvyeN5oEo/ti7fw0hCdzArQhcTtkaU4m5spL7+5XUOnFiwPZB+unxGVVQ5rmI9TVW74iNZ4ESlzRTp2VT0sZ6QIIOBZA2kLx+fgg3YQuZpZ4rz6oJ8zyWEik+v14Rm6AUBI1XTyVXDr2KJZpXJ5cVCW/xIua4Z97woKZJ1qk7rL/PrN2iT7/6bM35rVFU3kTvZKfXRPTE8ZWTiWGWAFu+QIDAQAB\n-----END PUBLIC KEY-----");
+        let _a = get_pub_key().await.unwrap();
+        
+        Ok(())
+    }
+
+    #[actix_rt::test]
+    async fn get_pub_key_with_url_var() -> std::io::Result<()> {
+        std::env::remove_var("TAGENT_PUB_KEY");
+        std::env::set_var("TAGENT_PUB_KEY_URL", "https://admin.tapis.io/v3/tenants/admin");
+        // note: this test can fail if Tapis API is not available..
+        let _a = get_pub_key().await.unwrap();
+        
+        Ok(())
+    }
+
+    #[actix_rt::test]
+    async fn get_pub_key_should_fail_if_no_vars() -> std::io::Result<()> {
+        std::env::remove_var("TAGENT_PUB_KEY");
+        std::env::remove_var("TAGENT_PUB_KEY_URL");
+        let a = get_pub_key().await;
+        assert!(a.is_err());
+        Ok(())
+    }
+}
