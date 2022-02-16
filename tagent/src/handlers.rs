@@ -10,6 +10,9 @@ use std::path::{Path, PathBuf};
 use actix_multipart::Multipart;
 use async_std::prelude::*;
 use futures::{StreamExt, TryStreamExt};
+
+// clippy complained without gating this use statement since it is only used in the test module.
+#[cfg(test)]
 use jwt_simple::algorithms::RS256PublicKey;
 
 use uuid::Uuid;

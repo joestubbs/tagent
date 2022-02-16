@@ -155,11 +155,6 @@ pub async fn get_pub_key() -> std::io::Result<RS256PublicKey> {
 
 #[cfg(test)]
 mod test {
-    use actix_web::App;
-    use reqwest::StatusCode;
-
-    use crate::make_config;
-
     use super::*;
 
     #[actix_rt::test]
