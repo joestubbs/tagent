@@ -8,10 +8,6 @@ use actix_multipart::Multipart;
 use async_std::prelude::*;
 use futures::{StreamExt, TryStreamExt};
 
-// clippy complained without gating this use statement since it is only used in the test module.
-#[cfg(test)]
-use jwt_simple::algorithms::RS256PublicKey;
-
 use uuid::Uuid;
 
 use super::auth::get_subject_of_request;
@@ -271,6 +267,7 @@ pub async fn post_file_contents_path(
 #[cfg(test)]
 mod test {
     use actix_web::App;
+    use jwt_simple::algorithms::RS256PublicKey;
     use reqwest::StatusCode;
 
     use crate::make_config;
