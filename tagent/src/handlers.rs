@@ -1,9 +1,6 @@
 use actix_files::NamedFile;
-use actix_web::{
-    get, post, web, Either, Error, HttpRequest, HttpResponse, Responder, ResponseError, Result,
-};
+use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder, Result};
 use log::{debug, info, warn};
-use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -18,11 +15,13 @@ use jwt_simple::algorithms::RS256PublicKey;
 use uuid::Uuid;
 
 use super::auth::get_subject_of_request;
-use super::representations::{AppState, ErrorRsp, FileListingRsp, FileUploadRsp, Ready};
+use super::representations::{
+    make_tagent_error, AppState, FileListingRsp, FileUploadRsp, Ready, TagentError,
+};
 
 // status endpoints ---
 #[get("/status/ready")]
-pub async fn ready(app_state: web::Data<AppState>) -> Result<impl Responder> {
+pub async fn ready(app_state: web::Data<AppState>) -> Result<impl Responder, TagentError> {
     debug!("processing request to GET /status/ready");
     let version = &app_state.get_ref().app_version;
     let r = Ready {
@@ -105,7 +104,7 @@ pub fn get_local_listing(full_path: PathBuf) -> Vec<String> {
     result
 }
 
-type FileListHttpRsp = Either<HttpResponse, web::Json<FileListingRsp>>;
+type FileListHttpRsp = Result<web::Json<FileListingRsp>, TagentError>;
 
 #[get("/files/list/{path:.*}")]
 pub async fn list_files_path(
@@ -125,13 +124,7 @@ pub async fn list_files_path(
         Err(error) => {
             let msg = format!("got an error from get_subject_of_request; error: {}", error);
             info!("{}", msg);
-            let r = ErrorRsp {
-                status: String::from("error"),
-                message: msg,
-                version: version.to_string(),
-                result: String::from("none"),
-            };
-            return Either::Left(HttpResponse::BadRequest().json(r));
+            return Err(make_tagent_error(msg, version.to_string()));
         }
     };
     info!("parsed jwt; subject: {}", subject);
@@ -145,13 +138,7 @@ pub async fn list_files_path(
             "Invalid path; path {:?} does not exist",
             path_buf_to_str(&full_path)
         );
-        let r = ErrorRsp {
-            status: String::from("error"),
-            message,
-            version: version.to_string(),
-            result: String::from("none"),
-        };
-        return Either::Left(HttpResponse::BadRequest().json(r));
+        return Err(make_tagent_error(message, version.to_string()));
     }
     let result = get_local_listing(full_path);
 
@@ -161,54 +148,20 @@ pub async fn list_files_path(
         version: version.to_string(),
         result,
     };
-    Either::Right(web::Json(r))
-}
-
-// The Error type that can convert to a actix_web::HttpResponse
-#[derive(Debug)]
-pub struct TagentError {
-    message: String,
-    version: String,
-}
-
-impl fmt::Display for TagentError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Error: {}", self.message)
-    }
-}
-
-impl ResponseError for TagentError {
-    fn error_response(&self) -> HttpResponse {
-        let m = &self.message;
-        let v = &self.version;
-        let r = ErrorRsp {
-            status: String::from("error"),
-            message: m.to_string(),
-            version: v.to_string(),
-            result: String::from("none"),
-        };
-        let body = serde_json::to_value(&r).unwrap().to_string();
-        HttpResponse::BadRequest().body(body)
-    }
-}
-
-pub fn make_tagent_error(message: String, version: String) -> Result<(), TagentError> {
-    let r = TagentError { message, version };
-    Err(r)
+    Ok(web::Json(r))
 }
 
 // type FileContentsHttpRsp = Either<HttpResponse, Result<NamedFile>>;
-type FileContentsHttpRsp = Result<HttpResponse, Error>;
+type FileContentsHttpRsp = Result<HttpResponse, TagentError>;
 
 #[get("/files/contents/{path:.*}")]
 pub async fn get_file_contents_path(
     _req: HttpRequest,
-    app_version: web::Data<String>,
-    root_dir: web::Data<String>,
+    app_state: web::Data<AppState>,
     params: web::Path<(PathBuf,)>,
 ) -> FileContentsHttpRsp {
-    let version = app_version.get_ref().to_string();
-    let root_dir = root_dir.get_ref().to_string();
+    let version = &app_state.get_ref().app_version;
+    let root_dir = &app_state.get_ref().root_dir;
     let params = params.into_inner();
     let path = params.0;
     let mut full_path = PathBuf::from(root_dir);
@@ -224,24 +177,25 @@ pub async fn get_file_contents_path(
         error = true;
     };
     if error {
-        make_tagent_error(message, version)?;
+        return Err(make_tagent_error(message, version.to_string()));
     }
     //this line compiles but doesn't allow for a custom error
-    let fbody = NamedFile::open(full_path)?;
-    // let fbody = match fbody {
-    //     Ok(f) => f,
-    //     Err(e) => {
-    //         let msg = format!("Got error trying to open file; details: {}", e);
-    //         let er = make_tagent_error(msg, version.to_string())?;
-    //     },
-    // };
+    let fbody = NamedFile::open(full_path);
+    let fbody = match fbody {
+        Ok(f) => f,
+        Err(e) => {
+            let msg = format!("Got error trying to open file; details: {}", e);
+            return Err(make_tagent_error(msg, version.to_string()));
+        }
+    };
     let res = fbody.into_response(&_req);
     Ok(res)
 }
 
-pub async fn save_file(mut payload: Multipart, full_path: &str) -> std::io::Result<()> {
+pub async fn save_file(mut payload: Multipart, full_path: &str) -> std::io::Result<String> {
     // cf., https://github.com/actix/examples/blob/master/forms/multipart/src/main.rs#L8
     // iterate over multipart stream
+    let mut filepath = "na".to_string();
     while let Ok(Some(mut field)) = payload.try_next().await {
         // A multipart/form-data stream has to contain `content_disposition`
         let content_disposition = field.content_disposition();
@@ -250,7 +204,7 @@ pub async fn save_file(mut payload: Multipart, full_path: &str) -> std::io::Resu
             .get_filename()
             .map_or_else(|| Uuid::new_v4().to_string(), sanitize_filename::sanitize);
 
-        let filepath = format!("{}/{}", full_path, filename);
+        filepath = format!("{}/{}", full_path, filename);
 
         let mut f = async_std::fs::File::create(&filepath).await?;
 
@@ -261,20 +215,19 @@ pub async fn save_file(mut payload: Multipart, full_path: &str) -> std::io::Resu
             f.write_all(&data).await?;
         }
     }
-    Ok(())
+    Ok(filepath)
 }
 
-type FileUploadHttpRsp = Either<HttpResponse, web::Json<FileUploadRsp>>;
+type FileUploadHttpRsp = Result<web::Json<FileUploadRsp>, TagentError>;
 
 #[post("/files/contents/{path:.*}")]
 pub async fn post_file_contents_path(
-    app_version: web::Data<String>,
-    root_dir: web::Data<String>,
+    app_state: web::Data<AppState>,
     params: web::Path<(String,)>,
     payload: Multipart,
 ) -> FileUploadHttpRsp {
-    let version = app_version.get_ref().to_string();
-    let root_dir = root_dir.get_ref().to_string();
+    let version = &app_state.get_ref().app_version;
+    let root_dir = &app_state.get_ref().root_dir;
     let params = params.into_inner();
     let path = params.0;
     let mut full_path = PathBuf::from(root_dir);
@@ -293,25 +246,26 @@ pub async fn post_file_contents_path(
         error = true;
     };
     if error {
-        let r = ErrorRsp {
-            status: String::from("error"),
-            message,
-            version: version.to_string(),
-            result: String::from("none"),
-        };
-        return Either::Left(HttpResponse::BadRequest().json(r));
+        return Err(make_tagent_error(message, version.to_string()));
     };
     let full_path_s = path_buf_to_string(full_path).unwrap();
     let upload_path = save_file(payload, &full_path_s).await;
+    let upload_path = match upload_path {
+        Err(e) => {
+            let message = format!("Unable to save file to disk; details: {}", e);
+            return Err(make_tagent_error(message, version.to_string()));
+        }
+        Ok(p) => p,
+    };
 
     let r = FileUploadRsp {
         status: String::from("success"),
-        message: format!("file uploaded to {:?} successfully.", upload_path),
+        message: format!("file uploaded to {} successfully.", upload_path),
         result: String::from("none"),
         version: version.to_string(),
     };
 
-    Either::Right(web::Json(r))
+    Ok(web::Json(r))
 }
 
 #[cfg(test)]
