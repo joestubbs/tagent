@@ -1,5 +1,5 @@
 use jwt_simple::algorithms::RS256PublicKey;
-use log::{error, info};
+use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
 
 // Tapis Tenants API response structs ---
@@ -33,7 +33,7 @@ async fn fetch_publickey(uri: &str) -> Result<String, String> {
     };
     match res.status() {
         reqwest::StatusCode::OK => {
-            info!("got 200 from request to fetch public key");
+            debug!("got 200 from request to fetch public key");
             match res.json::<TenantsAPIResponse>().await {
                 Ok(response) => {
                     let public_key = response.result.public_key;
@@ -69,7 +69,10 @@ async fn fetch_publickey(uri: &str) -> Result<String, String> {
 async fn fetch_pub_key_str_from_vars() -> std::io::Result<String> {
     let pub_key_url = std::env::var("TAGENT_PUB_KEY_URL");
     let pub_key_url = match pub_key_url {
-        Ok(t) => t,
+        Ok(t) => {
+            info!("TAGENT_PUB_KEY_URL was set to {}.", t);
+            t
+        }
         _ => {
             let msg = "Could not determine public key; must specify one of TAGENT_PUB_KEY or TAGENT_PUB_KEY_URL";
             error!("{}", msg);
@@ -97,7 +100,10 @@ async fn get_public_key_str() -> std::io::Result<String> {
     // if a public key is passed in directly as an environment variable, use that
     let pub_key_str = std::env::var("TAGENT_PUB_KEY");
     match pub_key_str {
-        Ok(p) => Ok(p),
+        Ok(p) => {
+            info!("TAGENT_PUB_KEY was set.");
+            Ok(p)
+        }
         _ => {
             // otherwise, get the public key from the Tenants API
             return fetch_pub_key_str_from_vars().await;
