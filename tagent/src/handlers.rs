@@ -11,9 +11,7 @@ use futures::{StreamExt, TryStreamExt};
 use uuid::Uuid;
 
 use super::auth::get_subject_of_request;
-use super::representations::{
-    make_tagent_error, AppState, FileListingRsp, FileUploadRsp, Ready, TagentError,
-};
+use super::representations::{AppState, FileListingRsp, FileUploadRsp, Ready, TagentError};
 
 // status endpoints ---
 #[get("/status/ready")]
@@ -120,7 +118,7 @@ pub async fn list_files_path(
         Err(error) => {
             let msg = format!("got an error from get_subject_of_request; error: {}", error);
             info!("{}", msg);
-            return Err(make_tagent_error(msg, version.to_string()));
+            return Err(TagentError::new(msg, version.to_string()));
         }
     };
     info!("parsed jwt; subject: {}", subject);
@@ -134,7 +132,7 @@ pub async fn list_files_path(
             "Invalid path; path {:?} does not exist",
             path_buf_to_str(&full_path)
         );
-        return Err(make_tagent_error(message, version.to_string()));
+        return Err(TagentError::new(message, version.to_string()));
     }
     let result = get_local_listing(full_path);
 
@@ -173,7 +171,7 @@ pub async fn get_file_contents_path(
         error = true;
     };
     if error {
-        return Err(make_tagent_error(message, version.to_string()));
+        return Err(TagentError::new(message, version.to_string()));
     }
     //this line compiles but doesn't allow for a custom error
     let fbody = NamedFile::open(full_path);
@@ -181,7 +179,7 @@ pub async fn get_file_contents_path(
         Ok(f) => f,
         Err(e) => {
             let msg = format!("Got error trying to open file; details: {}", e);
-            return Err(make_tagent_error(msg, version.to_string()));
+            return Err(TagentError::new(msg, version.to_string()));
         }
     };
     let res = fbody.into_response(&_req);
@@ -242,14 +240,14 @@ pub async fn post_file_contents_path(
         error = true;
     };
     if error {
-        return Err(make_tagent_error(message, version.to_string()));
+        return Err(TagentError::new(message, version.to_string()));
     };
     let full_path_s = path_buf_to_string(full_path).unwrap();
     let upload_path = save_file(payload, &full_path_s).await;
     let upload_path = match upload_path {
         Err(e) => {
             let message = format!("Unable to save file to disk; details: {}", e);
-            return Err(make_tagent_error(message, version.to_string()));
+            return Err(TagentError::new(message, version.to_string()));
         }
         Ok(p) => p,
     };

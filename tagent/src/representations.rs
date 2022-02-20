@@ -48,6 +48,12 @@ pub struct TagentError {
     version: String,
 }
 
+impl TagentError {
+    pub fn new(message: String, version: String) -> Self {
+        TagentError { message, version }
+    }
+}
+
 impl fmt::Display for TagentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Error: {}", self.message)
@@ -67,8 +73,4 @@ impl ResponseError for TagentError {
         let body = serde_json::to_value(&r).unwrap().to_string();
         HttpResponse::BadRequest().body(body)
     }
-}
-
-pub fn make_tagent_error(message: String, version: String) -> TagentError {
-    TagentError { message, version }
 }
