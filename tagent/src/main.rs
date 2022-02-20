@@ -35,8 +35,9 @@ async fn main() -> std::io::Result<()> {
     dotenv().ok();
     env_logger::init();
 
-    let app_version = String::from("0.1.0");
+    let app_version = String::from(env!("CARGO_PKG_VERSION"));
     let root_dir = handlers::get_root_dir()?;
+    info!("tagent version {}", app_version);
     info!("tagent running with root directory: {}", root_dir);
     // let pub_key = String::from("-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAieWoWm/7AZPheleSJSXR/CS9vnr2m7qsjzvqv7PXr5AOxpw+eYn5h1/7lBqludzle4fI8ai/mv2WsTEC7C3HuIF5D+EuCQtXe89YPI8e4Q/gc660vWhG3ZYA5UrZyAOAJvDvcd/N8ZCjyW8fZ5tYsMlcWf6m9d29QLtLc8kIIZJiFuQcfiq5NiaB5tYU6zOQzO6fYUO44egni1DH6spm0btqobIsNQauunXSuZD3lLwXGnuS1VE+3pPEIFeAq0tnQcuJxsUZIRbiWRgAnNHCFoxeB3kMysKUr1IMjqlUlTBgDbCvfn8RJxQUeMgEJygsa/m9xHzfX3IoAm4NfvsEPwIDAQAB\n-----END PUBLIC KEY-----");
     let pub_key = config::get_pub_key().await?;
