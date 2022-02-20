@@ -17,6 +17,36 @@ lib. (See https://docs.rs/crate/openssl-sys/0.9.36). On Debian/Ubuntu, you can i
 $ sudo apt-get install pkg-config libssl-dev
 ```
 
+### DB Setup Prequisites 
+
+For working with sqlite, you will need the sqlite libraries. On Debian/Ubuntu: 
+
+```
+$ sudo apt-get install sqlite3 libsqlite3-dev
+```
+
+and the Diesel CLI:
+
+```
+$ cargo install diesel_cli --no-default-features --features sqlite
+```
+
+Within the `tagent/tagent` directory, run the following commands to set up the database. 
+
+1) Create the database:
+
+```
+$ diesel setup
+```
+
+2) Run migrations:
+
+```
+$ diesel migration run
+```
+
+### Compile tagent
+
 With rust and the pre-requisites installed, use `cargo` to build the project:
 
 ```

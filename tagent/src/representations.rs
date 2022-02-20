@@ -33,6 +33,24 @@ pub struct FileListingRsp {
     pub result: Vec<String>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct Acls {
+    pub subject: String,
+    pub action: String,
+    pub path: String,
+    pub user: String,
+    pub create_by: String,
+    pub create_time: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AclListingRsp {
+    pub message: String,
+    pub status: String,
+    pub version: String,
+    pub result: Vec<Acls>,
+}
+
 #[derive(Serialize)]
 pub struct FileUploadRsp {
     pub message: String,

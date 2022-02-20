@@ -1,14 +1,20 @@
 use actix_web::middleware::Logger;
 use actix_web::web::ServiceConfig;
 use actix_web::{web, App, HttpServer};
+
+#[macro_use]
+extern crate diesel;
+
 use dotenv::dotenv;
 use log::info;
 
 mod auth;
 mod config;
+mod db;
 mod handlers;
 mod models;
 mod representations;
+mod schema;
 
 fn make_config(app_data: web::Data<representations::AppState>) -> impl FnOnce(&mut ServiceConfig) {
     |cfg: &mut ServiceConfig| {
@@ -18,6 +24,7 @@ fn make_config(app_data: web::Data<representations::AppState>) -> impl FnOnce(&m
                 // status routes ----
                 .service(handlers::ready)
                 // acls routes ----
+                .service(handlers::create_acl)
                 .service(handlers::get_all_acls)
                 .service(handlers::get_acls_for_service)
                 .service(handlers::get_acls_for_service_user)

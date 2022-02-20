@@ -15,6 +15,9 @@ use jwt_simple::algorithms::RS256PublicKey;
 use uuid::Uuid;
 
 use super::auth::get_subject_of_request;
+use super::db::establish_connection;
+use super::schema::acls;
+use super::models::NewAcl;
 use super::representations::{
     make_tagent_error, AppState, FileListingRsp, FileUploadRsp, Ready, TagentError,
 };
@@ -34,8 +37,16 @@ pub async fn ready(app_state: web::Data<AppState>) -> Result<impl Responder, Tag
 }
 
 // acls endpoints ---
+#[post("/acls")]
+pub async fn create_acl(acl: web::Json<NewAcl<'_>>) -> impl Responder {
+    
+    "todo: create_acl".to_string()
+}
+
 #[get("/acls/all")]
 pub async fn get_all_acls() -> impl Responder {
+    let connection = establish_connection();
+
     "todo: get_all_acls".to_string()
 }
 
