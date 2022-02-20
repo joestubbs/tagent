@@ -8,7 +8,7 @@ run-local:
 	cargo run
 
 lint:
-	cargo clippy
+	cargo clippy  --all-features --tests
 	cargo fmt
 
 before-push: test lint
