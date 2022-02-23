@@ -1,7 +1,7 @@
 use crate::schema::*;
-use std::fmt;
 use diesel::Queryable;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum AclAction {
@@ -12,10 +12,10 @@ pub enum AclAction {
 
 impl fmt::Display for AclAction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            &Self::Read => write!(f, "Read"),
-            &Self::Execute => write!(f, "Execute"),
-            &Self::Write => write!(f, "Write")
+        match *self {
+            Self::Read => write!(f, "Read"),
+            Self::Execute => write!(f, "Execute"),
+            Self::Write => write!(f, "Write"),
         }
     }
 }
@@ -31,7 +31,6 @@ pub struct DbAcl {
     pub create_by: String,
     pub create_time: String,
 }
-
 
 // struct representing an ACL row to insert into sqlite the id attribute is not included
 #[derive(Debug, Insertable)]
@@ -53,4 +52,3 @@ pub struct NewAclJson {
     pub path: String,
     pub user: String,
 }
-

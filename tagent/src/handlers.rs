@@ -11,9 +11,11 @@ use futures::{StreamExt, TryStreamExt};
 use uuid::Uuid;
 
 use super::auth::get_subject_of_request;
-use super::db::{establish_connection, save_acl, retrieve_all_acls};
+use super::db::{establish_connection, retrieve_all_acls, save_acl};
 use super::models::NewAclJson;
-use super::representations::{AppState, FileListingRsp, FileUploadRsp, Ready, TagentError, CreateAclRsp, AclListingRsp, Acl};
+use super::representations::{
+    Acl, AclListingRsp, AppState, CreateAclRsp, FileListingRsp, FileUploadRsp, Ready, TagentError,
+};
 
 // status endpoints ---
 #[get("/status/ready")]
@@ -31,9 +33,11 @@ pub async fn ready(app_state: web::Data<AppState>) -> Result<impl Responder, Tag
 
 // acls endpoints ---
 #[post("/acls")]
-pub async fn create_acl(_req: HttpRequest, 
-app_state: web::Data<AppState>, 
-acl: web::Json<NewAclJson>) -> Result<impl Responder, TagentError> {
+pub async fn create_acl(
+    _req: HttpRequest,
+    app_state: web::Data<AppState>,
+    acl: web::Json<NewAclJson>,
+) -> Result<impl Responder, TagentError> {
     let version = &app_state.get_ref().app_version;
     let pub_key = &app_state.get_ref().pub_key;
     debug!("processing request to POST /acls");
@@ -47,10 +51,22 @@ acl: web::Json<NewAclJson>) -> Result<impl Responder, TagentError> {
         }
     };
     let mut conn = establish_connection();
-    let r = save_acl(&mut conn, &acl.subject, &acl.action, &acl.path, &acl.user, &subject);
+    let r = save_acl(
+        &mut conn,
+        &acl.subject,
+        &acl.action,
+        &acl.path,
+        &acl.user,
+        &subject,
+    );
     let _r = match r {
         Ok(r) => r,
-        Err(r) => return Err(TagentError::new(format!("Could not save ACL to db; details {}", r), version.to_string()))
+        Err(r) => {
+            return Err(TagentError::new(
+                format!("Could not save ACL to db; details {}", r),
+                version.to_string(),
+            ))
+        }
     };
     let rsp = CreateAclRsp {
         status: String::from("success"),
@@ -63,10 +79,10 @@ acl: web::Json<NewAclJson>) -> Result<impl Responder, TagentError> {
 }
 
 #[get("/acls/all")]
-pub async fn get_all_acls(_req: HttpRequest, 
-    app_state: web::Data<AppState>) 
-    -> Result<impl Responder, TagentError> {
-
+pub async fn get_all_acls(
+    _req: HttpRequest,
+    app_state: web::Data<AppState>,
+) -> Result<impl Responder, TagentError> {
     let version = &app_state.get_ref().app_version;
     let pub_key = &app_state.get_ref().pub_key;
     debug!("processing request to POST /acls");
@@ -83,17 +99,22 @@ pub async fn get_all_acls(_req: HttpRequest,
     let acls_db = retrieve_all_acls(&mut conn);
     let acls_db = match acls_db {
         Ok(acls) => acls,
-        Err(e) => return Err(TagentError::new(format!("Could not retrieve ACLs from db; details {}", e), version.to_string()))
+        Err(e) => {
+            return Err(TagentError::new(
+                format!("Could not retrieve ACLs from db; details {}", e),
+                version.to_string(),
+            ))
+        }
     };
-    
+
     let mut acls = Vec::<Acl>::new();
     for a in &acls_db {
         acls.push(Acl::from_db_acl(a));
-    };
+    }
 
     let rsp = AclListingRsp {
         status: String::from("success"),
-        message: format!("ACLs retrieved successfully."),
+        message: "ACLs retrieved successfully.".to_string(),
         result: acls,
         version: version.to_string(),
     };

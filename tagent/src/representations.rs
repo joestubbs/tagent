@@ -1,8 +1,8 @@
+use super::models::DbAcl;
 use actix_web::{HttpResponse, ResponseError};
 use jwt_simple::algorithms::RS256PublicKey;
 use serde::Serialize;
 use std::fmt;
-use super::models::DbAcl;
 
 pub struct AppState {
     pub app_version: String,
@@ -54,7 +54,7 @@ pub struct Acl {
 
 impl Acl {
     pub fn from_db_acl(db_acl: &DbAcl) -> Self {
-        Acl{
+        Acl {
             subject: db_acl.subject.clone(),
             action: db_acl.action.clone(),
             path: db_acl.path.clone(),
@@ -62,9 +62,7 @@ impl Acl {
             create_by: db_acl.create_by.clone(),
             create_time: db_acl.create_time.clone(),
         }
-
     }
-    
 }
 
 #[derive(Debug, Serialize)]
