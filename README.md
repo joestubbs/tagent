@@ -134,3 +134,15 @@ $ curl -F upload=@up.txt localhost:8080/files/contents/rust/tmp/up.txt -v | jq
   "version": "0.1.0"
 }
 
+6. Create a new ACL 
+
+```
+$ curl -H "content-type: application/json" -d '{"subject": "tenants@admin", "action": "Write", "user": "self", "path": "/*"}'  -H "x-tapis-token: $jwt" localhost:8080/acls |jq
+
+{
+  "message": "ACL created successfully.",
+  "status": "success",
+  "result": "none",
+  "version": "0.1.0"
+}
+```

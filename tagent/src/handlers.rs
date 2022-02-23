@@ -11,10 +11,9 @@ use futures::{StreamExt, TryStreamExt};
 use uuid::Uuid;
 
 use super::auth::get_subject_of_request;
-use super::db::establish_connection;
-use super::schema::acls;
-use super::models::NewAcl;
-use super::representations::{AppState, FileListingRsp, FileUploadRsp, Ready, TagentError};
+use super::db::{establish_connection, save_acl, retrieve_all_acls};
+use super::models::NewAclJson;
+use super::representations::{AppState, FileListingRsp, FileUploadRsp, Ready, TagentError, CreateAclRsp, AclListingRsp, Acl};
 
 // status endpoints ---
 #[get("/status/ready")]
@@ -32,16 +31,74 @@ pub async fn ready(app_state: web::Data<AppState>) -> Result<impl Responder, Tag
 
 // acls endpoints ---
 #[post("/acls")]
-pub async fn create_acl(acl: web::Json<NewAcl<'_>>) -> impl Responder {
-    
-    "todo: create_acl".to_string()
+pub async fn create_acl(_req: HttpRequest, 
+app_state: web::Data<AppState>, 
+acl: web::Json<NewAclJson>) -> Result<impl Responder, TagentError> {
+    let version = &app_state.get_ref().app_version;
+    let pub_key = &app_state.get_ref().pub_key;
+    debug!("processing request to POST /acls");
+    let subject = get_subject_of_request(_req, pub_key).await;
+    let subject = match subject {
+        Ok(sub) => sub,
+        Err(error) => {
+            let msg = format!("got an error from get_subject_of_request; error: {}", error);
+            info!("{}", msg);
+            return Err(TagentError::new(msg, version.to_string()));
+        }
+    };
+    let mut conn = establish_connection();
+    let r = save_acl(&mut conn, &acl.subject, &acl.action, &acl.path, &acl.user, &subject);
+    let _r = match r {
+        Ok(r) => r,
+        Err(r) => return Err(TagentError::new(format!("Could not save ACL to db; details {}", r), version.to_string()))
+    };
+    let rsp = CreateAclRsp {
+        status: String::from("success"),
+        message: format!("ACL for subject {} created successfully.", acl.subject),
+        result: String::from("none"),
+        version: version.to_string(),
+    };
+
+    Ok(web::Json(rsp))
 }
 
 #[get("/acls/all")]
-pub async fn get_all_acls() -> impl Responder {
-    let connection = establish_connection();
+pub async fn get_all_acls(_req: HttpRequest, 
+    app_state: web::Data<AppState>) 
+    -> Result<impl Responder, TagentError> {
 
-    "todo: get_all_acls".to_string()
+    let version = &app_state.get_ref().app_version;
+    let pub_key = &app_state.get_ref().pub_key;
+    debug!("processing request to POST /acls");
+    let subject = get_subject_of_request(_req, pub_key).await;
+    let _subject = match subject {
+        Ok(sub) => sub,
+        Err(error) => {
+            let msg = format!("got an error from get_subject_of_request; error: {}", error);
+            info!("{}", msg);
+            return Err(TagentError::new(msg, version.to_string()));
+        }
+    };
+    let mut conn = establish_connection();
+    let acls_db = retrieve_all_acls(&mut conn);
+    let acls_db = match acls_db {
+        Ok(acls) => acls,
+        Err(e) => return Err(TagentError::new(format!("Could not retrieve ACLs from db; details {}", e), version.to_string()))
+    };
+    
+    let mut acls = Vec::<Acl>::new();
+    for a in &acls_db {
+        acls.push(Acl::from_db_acl(a));
+    };
+
+    let rsp = AclListingRsp {
+        status: String::from("success"),
+        message: format!("ACLs retrieved successfully."),
+        result: acls,
+        version: version.to_string(),
+    };
+
+    Ok(web::Json(rsp))
 }
 
 #[get("/acls/{service}")]

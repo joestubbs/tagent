@@ -1,9 +1,28 @@
 use crate::schema::*;
+use std::fmt;
 use diesel::Queryable;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Queryable)]
-pub struct Acl {
+#[derive(Debug, Serialize, Deserialize)]
+pub enum AclAction {
+    Read,
+    Execute,
+    Write,
+}
+
+impl fmt::Display for AclAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            &Self::Read => write!(f, "Read"),
+            &Self::Execute => write!(f, "Execute"),
+            &Self::Write => write!(f, "Write")
+        }
+    }
+}
+
+// struct representing a database record retrieved from sqlite; the id attribute is included
+#[derive(Debug, Serialize, Deserialize, Queryable, PartialEq)]
+pub struct DbAcl {
     pub id: i32,
     pub subject: String,
     pub action: String,
@@ -13,6 +32,8 @@ pub struct Acl {
     pub create_time: String,
 }
 
+
+// struct representing an ACL row to insert into sqlite the id attribute is not included
 #[derive(Debug, Insertable)]
 #[table_name = "acls"]
 pub struct NewAcl<'a> {
@@ -24,4 +45,12 @@ pub struct NewAcl<'a> {
     pub create_time: &'a str,
 }
 
+// struct representing a user-supplied JSON object describing a new ACL to be created
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NewAclJson {
+    pub subject: String,
+    pub action: AclAction,
+    pub path: String,
+    pub user: String,
+}
 

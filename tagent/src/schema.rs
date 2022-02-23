@@ -1,6 +1,6 @@
 table! {
     acls (id) {
-        id -> Nullable<Integer>,
+        id -> Integer,
         subject -> Text,
         action -> Text,
         path -> Text,

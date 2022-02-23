@@ -2,6 +2,7 @@ use actix_web::{HttpResponse, ResponseError};
 use jwt_simple::algorithms::RS256PublicKey;
 use serde::Serialize;
 use std::fmt;
+use super::models::DbAcl;
 
 pub struct AppState {
     pub app_version: String,
@@ -26,6 +27,14 @@ pub struct ErrorRsp {
 }
 
 #[derive(Serialize)]
+pub struct CreateAclRsp {
+    pub message: String,
+    pub status: String,
+    pub result: String,
+    pub version: String,
+}
+
+#[derive(Serialize)]
 pub struct FileListingRsp {
     pub message: String,
     pub status: String,
@@ -34,7 +43,7 @@ pub struct FileListingRsp {
 }
 
 #[derive(Debug, Serialize)]
-pub struct Acls {
+pub struct Acl {
     pub subject: String,
     pub action: String,
     pub path: String,
@@ -43,12 +52,27 @@ pub struct Acls {
     pub create_time: String,
 }
 
+impl Acl {
+    pub fn from_db_acl(db_acl: &DbAcl) -> Self {
+        Acl{
+            subject: db_acl.subject.clone(),
+            action: db_acl.action.clone(),
+            path: db_acl.path.clone(),
+            user: db_acl.user.clone(),
+            create_by: db_acl.create_by.clone(),
+            create_time: db_acl.create_time.clone(),
+        }
+
+    }
+    
+}
+
 #[derive(Debug, Serialize)]
 pub struct AclListingRsp {
     pub message: String,
     pub status: String,
     pub version: String,
-    pub result: Vec<Acls>,
+    pub result: Vec<Acl>,
 }
 
 #[derive(Serialize)]
