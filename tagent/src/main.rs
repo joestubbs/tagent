@@ -32,6 +32,9 @@ fn make_config(app_data: web::Data<representations::AppState>) -> impl FnOnce(&m
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    dbg!(std::env::current_dir());
+    config::read_config();
+
     dotenv().ok();
     env_logger::init();
 

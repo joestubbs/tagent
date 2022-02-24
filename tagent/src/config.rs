@@ -1,6 +1,9 @@
+use config::Config;
 use jwt_simple::algorithms::RS256PublicKey;
 use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
+
+use crate::representations::TagentError;
 
 // Tapis Tenants API response structs ---
 
@@ -156,6 +159,25 @@ pub async fn get_pub_key() -> std::io::Result<RS256PublicKey> {
         }
     };
     Ok(rsa_pub_key)
+}
+
+// Configuration management
+// ========================
+
+#[derive(Deserialize, Debug)]
+pub struct TagentConfig {
+    pub foo: String,
+    pub bar: i32,
+    pub baz: Option<String>,
+}
+
+pub fn read_config() -> Result<TagentConfig, TagentError> {
+    let settings = Config::builder()
+        .add_source(config::File::with_name("settings.yaml"))
+        .add_source(config::Environment::with_prefix("TAGENT")).build().unwrap();
+    let a = settings.try_deserialize::<TagentConfig>();
+    dbg!(&a);
+    Ok(a.unwrap())
 }
 
 #[cfg(test)]
