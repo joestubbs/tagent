@@ -20,11 +20,10 @@ impl fmt::Display for AclAction {
     }
 }
 
-
 #[derive(Debug, Serialize, Deserialize)]
 pub enum AclDecision {
     Allow,
-    Deny
+    Deny,
 }
 
 impl fmt::Display for AclDecision {
@@ -35,7 +34,6 @@ impl fmt::Display for AclDecision {
         }
     }
 }
-
 
 // struct representing a database record retrieved from sqlite; the id attribute is included
 #[derive(Debug, Serialize, Deserialize, Queryable, PartialEq)]

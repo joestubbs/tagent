@@ -1,5 +1,5 @@
 use actix_files::NamedFile;
-use actix_web::{get, post, put, delete,  web, HttpRequest, HttpResponse, Responder, Result};
+use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder, Result};
 use log::{debug, info, warn};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -11,10 +11,14 @@ use futures::{StreamExt, TryStreamExt};
 use uuid::Uuid;
 
 use super::auth::get_subject_of_request;
-use super::db::{establish_connection, retrieve_all_acls, save_acl, retrieve_acl_by_id, delete_acl_from_db_by_id, update_acl_in_db_by_id};
+use super::db::{
+    delete_acl_from_db_by_id, establish_connection, retrieve_acl_by_id, retrieve_all_acls,
+    save_acl, update_acl_in_db_by_id,
+};
 use super::models::NewAclJson;
 use super::representations::{
-    Acl, AclListingRsp, AppState, AclStringRsp, FileListingRsp, FileUploadRsp, Ready, TagentError, AclByIdRsp
+    Acl, AclByIdRsp, AclListingRsp, AclStringRsp, AppState, FileListingRsp, FileUploadRsp, Ready,
+    TagentError,
 };
 
 // status endpoints ---
@@ -124,12 +128,14 @@ pub async fn get_all_acls(
 }
 
 #[get("/acls/{id}")]
-pub async fn get_acl_by_id(_req: HttpRequest, app_state: web::Data<AppState>, path: web::Path<(i32,)>) 
--> Result<impl Responder, TagentError> {
-
+pub async fn get_acl_by_id(
+    _req: HttpRequest,
+    app_state: web::Data<AppState>,
+    path: web::Path<(i32,)>,
+) -> Result<impl Responder, TagentError> {
     let version = &app_state.get_ref().app_version;
     let pub_key = &app_state.get_ref().pub_key;
-    
+
     let id = path.0;
 
     debug!("processing request to GET /acls/{}", id);
@@ -149,7 +155,7 @@ pub async fn get_acl_by_id(_req: HttpRequest, app_state: web::Data<AppState>, pa
         Err(e) => {
             let msg = format!("Could not retrieve ACL with id {}; details: {}", id, e);
             debug!("{}", msg);
-            return Err(TagentError::new(msg, version.to_string()))
+            return Err(TagentError::new(msg, version.to_string()));
         }
     };
 
@@ -162,17 +168,18 @@ pub async fn get_acl_by_id(_req: HttpRequest, app_state: web::Data<AppState>, pa
         version: version.to_string(),
     };
 
-    Ok(web::Json(rsp))    
+    Ok(web::Json(rsp))
 }
 
-
 #[delete("/acls/{id}")]
-pub async fn delete_acl_by_id(_req: HttpRequest, app_state: web::Data<AppState>, path: web::Path<(i32,)>) 
--> Result<impl Responder, TagentError> {
-
+pub async fn delete_acl_by_id(
+    _req: HttpRequest,
+    app_state: web::Data<AppState>,
+    path: web::Path<(i32,)>,
+) -> Result<impl Responder, TagentError> {
     let version = &app_state.get_ref().app_version;
     let pub_key = &app_state.get_ref().pub_key;
-    
+
     let acl_id = path.0;
 
     debug!("processing request to DELETE /acls/{}", acl_id);
@@ -192,7 +199,7 @@ pub async fn delete_acl_by_id(_req: HttpRequest, app_state: web::Data<AppState>,
         Err(e) => {
             let msg = format!("Could not delete ACL with id {}; details: {}", acl_id, e);
             debug!("{}", msg);
-            return Err(TagentError::new(msg, version.to_string()))
+            return Err(TagentError::new(msg, version.to_string()));
         }
     };
 
@@ -203,17 +210,19 @@ pub async fn delete_acl_by_id(_req: HttpRequest, app_state: web::Data<AppState>,
         version: version.to_string(),
     };
 
-    Ok(web::Json(rsp))    
+    Ok(web::Json(rsp))
 }
 
-
 #[put("/acls/{id}")]
-pub async fn update_acl_by_id(_req: HttpRequest, app_state: web::Data<AppState>, path: web::Path<(i32,)>, acl: web::Json<NewAclJson>) 
--> Result<impl Responder, TagentError> {
-
+pub async fn update_acl_by_id(
+    _req: HttpRequest,
+    app_state: web::Data<AppState>,
+    path: web::Path<(i32,)>,
+    acl: web::Json<NewAclJson>,
+) -> Result<impl Responder, TagentError> {
     let version = &app_state.get_ref().app_version;
     let pub_key = &app_state.get_ref().pub_key;
-    
+
     let acl_id = path.0;
 
     debug!("processing request to PUT /acls/{}", acl_id);
@@ -227,22 +236,13 @@ pub async fn update_acl_by_id(_req: HttpRequest, app_state: web::Data<AppState>,
         }
     };
     let mut conn = establish_connection();
-    let result = update_acl_in_db_by_id(&mut conn, 
-        acl_id,
-        &acl.subject,
-        &acl.action,
-        &acl.path,
-        &acl.user,
-        &acl.decision,
-        &subject,
-    
-    );
+    let result = update_acl_in_db_by_id(&mut conn, acl_id, &acl, &subject);
     match result {
         Ok(_) => (),
         Err(e) => {
             let msg = format!("Could not update ACL with id {}; details: {}", acl_id, e);
             debug!("{}", msg);
-            return Err(TagentError::new(msg, version.to_string()))
+            return Err(TagentError::new(msg, version.to_string()));
         }
     };
 
@@ -253,11 +253,8 @@ pub async fn update_acl_by_id(_req: HttpRequest, app_state: web::Data<AppState>,
         version: version.to_string(),
     };
 
-    Ok(web::Json(rsp))    
+    Ok(web::Json(rsp))
 }
-
-
-
 
 #[get("/acls/{subject}")]
 pub async fn get_acls_for_subject() -> impl Responder {

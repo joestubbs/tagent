@@ -49,7 +49,7 @@ pub struct Acl {
 impl Acl {
     pub fn from_db_acl(db_acl: &DbAcl) -> Self {
         Acl {
-            id: db_acl.id.clone(),
+            id: db_acl.id,
             subject: db_acl.subject.clone(),
             action: db_acl.action.clone(),
             path: db_acl.path.clone(),
@@ -75,7 +75,6 @@ pub struct AclByIdRsp {
     pub status: String,
     pub version: String,
     pub result: Acl,
-
 }
 
 #[derive(Serialize)]

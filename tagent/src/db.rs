@@ -1,12 +1,12 @@
 use diesel::prelude::*;
 // use diesel::{Connection};
-use crate::models::{AclAction, DbAcl, AclDecision};
+use crate::models::{AclAction, AclDecision, DbAcl};
 use chrono::prelude::{DateTime, Utc};
 use dotenv::dotenv;
 use std::env;
 use std::time::SystemTime;
 
-use super::models::NewAcl;
+use super::models::{NewAcl, NewAclJson};
 use super::schema::acls;
 
 pub fn establish_connection() -> SqliteConnection {
@@ -53,35 +53,43 @@ pub fn retrieve_all_acls(conn: &mut SqliteConnection) -> Result<Vec<DbAcl>, dies
     acls::dsl::acls.load::<DbAcl>(conn)
 }
 
-pub fn retrieve_acl_by_id(conn: &mut SqliteConnection, id: i32) -> Result<DbAcl, diesel::result::Error> {
+pub fn retrieve_acl_by_id(
+    conn: &mut SqliteConnection,
+    id: i32,
+) -> Result<DbAcl, diesel::result::Error> {
     acls::dsl::acls.find(id).first(conn)
 }
 
-pub fn delete_acl_from_db_by_id(conn: &mut SqliteConnection, acl_id: i32) -> Result<usize, diesel::result::Error> {
+pub fn delete_acl_from_db_by_id(
+    conn: &mut SqliteConnection,
+    acl_id: i32,
+) -> Result<usize, diesel::result::Error> {
     use crate::schema::acls::id;
     diesel::delete(acls::table.filter(id.eq(&acl_id))).execute(conn)
 }
 
-pub fn update_acl_in_db_by_id(conn: &mut SqliteConnection, acl_id: i32, new_subject: &str,
-    new_action: &AclAction,
-    new_path: &str,
-    new_user: &str,
-    new_decision: &AclDecision,
-    new_create_by: &str) -> Result<usize, diesel::result::Error>  {
-        use crate::schema::acls::id;
-        use crate::schema::acls::subject;
-        use crate::schema::acls::action;
-        use crate::schema::acls::path;
-        use crate::schema::acls::user;
-        use crate::schema::acls::create_by;
-        use crate::schema::acls::decision;
+pub fn update_acl_in_db_by_id(
+    conn: &mut SqliteConnection,
+    acl_id: i32,
+    new_acl: &NewAclJson,
+    new_subject: &str,
+) -> Result<usize, diesel::result::Error> {
+    use crate::schema::acls::action;
+    use crate::schema::acls::create_by;
+    use crate::schema::acls::decision;
+    use crate::schema::acls::id;
+    use crate::schema::acls::path;
+    use crate::schema::acls::subject;
+    use crate::schema::acls::user;
 
-        diesel::update(acls::table.filter(id.eq(&acl_id)))
-        .set((action.eq(new_action.to_string()), 
-        subject.eq(new_subject),
-        path.eq(new_path), 
-        user.eq(new_user), 
-        decision.eq(new_decision.to_string()), create_by.eq(new_create_by)))
+    diesel::update(acls::table.filter(id.eq(&acl_id)))
+        .set((
+            action.eq(new_acl.action.to_string()),
+            subject.eq(new_acl.subject.clone()),
+            path.eq(new_acl.path.clone()),
+            user.eq(new_acl.user.clone()),
+            decision.eq(new_acl.decision.to_string()),
+            create_by.eq(new_subject),
+        ))
         .execute(conn)
-
-    }
+}
