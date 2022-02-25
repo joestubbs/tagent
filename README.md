@@ -133,6 +133,7 @@ $ curl -F upload=@up.txt localhost:8080/files/contents/rust/tmp/up.txt -v | jq
   "result": "none",
   "version": "0.1.0"
 }
+```
 
 6. Create a new ACL 
 
