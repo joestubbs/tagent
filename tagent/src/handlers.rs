@@ -339,7 +339,7 @@ mod test {
         let pub_str = String::from("-----BEGIN RSA PUBLIC KEY-----\nMIIBCgKCAQEAtsQsUV8QpqrygsY+2+JCQ6Fw8/omM71IM2N/R8pPbzbgOl0p78MZ\nGsgPOQ2HSznjD0FPzsH8oO2B5Uftws04LHb2HJAYlz25+lN5cqfHAfa3fgmC38Ff\nwBkn7l582UtPWZ/wcBOnyCgb3yLcvJrXyrt8QxHJgvWO23ITrUVYszImbXQ67YGS\n0YhMrbixRzmo2tpm3JcIBtnHrEUMsT0NfFdfsZhTT8YbxBvA8FdODgEwx7u/vf3J\n9qbi4+Kv8cvqyJuleIRSjVXPsIMnoejIn04APPKIjpMyQdnWlby7rNyQtE4+CV+j\ncFjqJbE/Xilcvqxt6DirjFCvYeKYl1uHLwIDAQAB\n-----END RSA PUBLIC KEY-----");
         let app_state = AppState {
             app_version: String::from("0.1.0"),
-            root_dir: String::from(""),
+            root_dir: PathBuf::from(""),
             pub_key: RS256PublicKey::from_pem(&pub_str).unwrap(),
         };
         let app = actix_web::test::init_service(

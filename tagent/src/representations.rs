@@ -1,11 +1,11 @@
 use actix_web::{HttpResponse, ResponseError};
 use jwt_simple::algorithms::RS256PublicKey;
 use serde::Serialize;
-use std::fmt;
+use std::{fmt, path::PathBuf};
 
 pub struct AppState {
     pub app_version: String,
-    pub root_dir: String,
+    pub root_dir: PathBuf,
     pub pub_key: RS256PublicKey,
 }
 
@@ -61,6 +61,18 @@ impl TagentError {
 impl From<&str> for TagentError {
     fn from(message: &str) -> Self {
         TagentError::new_with_version(String::from(message))
+    }
+}
+
+impl From<TagentError> for std::io::Error {
+    fn from(tagent_error: TagentError) -> Self {
+        std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!(
+                "TagentError (version: {}): {}",
+                tagent_error.message, tagent_error.version
+            ),
+        )
     }
 }
 
