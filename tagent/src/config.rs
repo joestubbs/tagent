@@ -174,7 +174,7 @@ mod test {
         let key = t.get_public_key_with_default(retriever).await?;
         let components = key.to_components();
         assert_eq!(components.n[0], 157);
-        assert_eq!(components.e, vec![1,0,1]);
+        assert_eq!(components.e, vec![1, 0, 1]);
         Ok(())
     }
 
