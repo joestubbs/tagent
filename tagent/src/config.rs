@@ -164,6 +164,9 @@ pub async fn get_pub_key() -> std::io::Result<RS256PublicKey> {
 // Configuration management
 // ========================
 
+const CONFIG_FILE: &str = ".tagent.yaml";
+const VAR_PREFIX: &str = "TAGENT";
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TagentConfig {
     pub foo: String,
@@ -190,11 +193,11 @@ impl From<config::ConfigError> for TagentError {
 impl TagentConfig {
     pub fn from_sources() -> Result<Self, TagentError> {
         let mut config = dirs::home_dir().ok_or_else(|| "couldn't get user's home directory")?;
-        config.push(".tagent.yaml");
+        config.push(CONFIG_FILE);
         let config_path = config
             .to_str()
             .ok_or_else(|| "path to config file cannot be converted to string")?;
-        Self::from_sources_with_names(config_path, "TAGENT")
+        Self::from_sources_with_names(config_path, VAR_PREFIX)
     }
 
     fn from_sources_with_names(file: &str, var_prefix: &str) -> Result<Self, TagentError> {
