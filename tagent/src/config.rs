@@ -200,7 +200,7 @@ impl TagentConfig {
     fn from_sources_with_names(file: &str, var_prefix: &str) -> Result<Self, TagentError> {
         let settings = Config::builder()
             .add_source(config::Config::try_from::<TagentConfig>(&Default::default())?)
-            .add_source(config::File::with_name(file))
+            .add_source(config::File::with_name(file).required(false))
             .add_source(config::Environment::with_prefix(var_prefix))
             .build()?
             .try_deserialize::<TagentConfig>()?;
