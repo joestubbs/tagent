@@ -23,19 +23,8 @@ struct TenantsAPIResponse {
 // fetch the public key from a GET request to a uri.
 // In pratcice, uri will be the Tapis tenants API endpoint; e.g.,
 // uri = https://admin.tapis.io/v3/tenants/admin
-async fn fetch_publickey(uri: &str) -> Result<String, String> {
-    let res = reqwest::get(uri).await;
-    let res = match res {
-        Ok(response) => response,
-        Err(error) => {
-            let msg = format!(
-                "Got error from GET request to Tenants API to retrieve public key. error: {}",
-                error
-            );
-            error!("{}", msg);
-            return Err(msg);
-        }
-    };
+async fn fetch_publickey(uri: &str) -> Result<String, TagentError> {
+    let res = reqwest::get(uri).await?;
     match res.status() {
         reqwest::StatusCode::OK => {
             debug!("got 200 from request to fetch public key");
@@ -48,71 +37,16 @@ async fn fetch_publickey(uri: &str) -> Result<String, String> {
                     );
                     Ok(public_key)
                 }
-                Err(error) => {
-                    let msg = format!(
-                        "Could not parse the JSON response from the tenants API; err: {}",
-                        error
-                    );
-                    error!("{}", msg);
-                    Err(msg)
-                }
+                Err(error) => Err(TagentError::from(format!(
+                    "Could not parse the JSON response from the tenants API; err: {}",
+                    error
+                ))),
             }
         }
-        _ => {
-            let msg = format!(
-                "did not get 200 from request to fetch public key; status: {}",
-                res.status()
-            );
-            error!("{}", msg);
-            Err(msg)
-        }
-    }
-}
-
-// Fetch the public key to use for signature verifaction from the Tenants API,
-// by using the URL defined in the TAGENT_PUB_KEY_URL variable.
-async fn fetch_pub_key_str_from_vars() -> std::io::Result<String> {
-    let pub_key_url = std::env::var("TAGENT_PUB_KEY_URL");
-    let pub_key_url = match pub_key_url {
-        Ok(t) => {
-            info!("TAGENT_PUB_KEY_URL was set to {}.", t);
-            t
-        }
-        _ => {
-            let msg = "Could not determine public key; must specify one of TAGENT_PUB_KEY or TAGENT_PUB_KEY_URL";
-            error!("{}", msg);
-            return Err(std::io::Error::new(std::io::ErrorKind::Other, msg));
-        }
-    };
-    let pub_key = fetch_publickey(&pub_key_url).await;
-    let pub_key = match pub_key {
-        Ok(p) => p,
-        Err(e) => {
-            let msg = format!(
-                "Got error trying to fetch the public key from URL: {}; details: {}",
-                pub_key_url, e
-            );
-            error!("{}", msg);
-            return Err(std::io::Error::new(std::io::ErrorKind::Other, msg));
-        }
-    };
-    Ok(pub_key)
-}
-
-// Checks for the presence of envrionment variables to determine whether to retrieve the public key from the
-// Tapis Tenants API or to get the public key from the environment.
-async fn get_public_key_str() -> std::io::Result<String> {
-    // if a public key is passed in directly as an environment variable, use that
-    let pub_key_str = std::env::var("TAGENT_PUB_KEY");
-    match pub_key_str {
-        Ok(p) => {
-            info!("TAGENT_PUB_KEY was set.");
-            Ok(p)
-        }
-        _ => {
-            // otherwise, get the public key from the Tenants API
-            return fetch_pub_key_str_from_vars().await;
-        }
+        _ => Err(TagentError::from(format!(
+            "did not get 200 from request to fetch public key; status: {}",
+            res.status()
+        ))),
     }
 }
 
@@ -144,23 +78,9 @@ fn insert_line_breaks_pub_key(pub_key: String) -> std::io::Result<String> {
     Ok(result)
 }
 
-// Public function for calculating the public key to use for signature verification.
-pub async fn get_pub_key() -> std::io::Result<RS256PublicKey> {
-    let pk_str = get_public_key_str().await?;
-    let pk_str = insert_line_breaks_pub_key(pk_str)?;
-    let rsa_pub_key = RS256PublicKey::from_pem(&pk_str);
-    let rsa_pub_key = match rsa_pub_key {
-        Ok(key) => key,
-        Err(error) => {
-            let msg = format!(
-                "Error generating RSAPublicKey from pub_key string; err: {}",
-                error
-            );
-            error!("{}", msg);
-            return Err(std::io::Error::new(std::io::ErrorKind::Other, msg));
-        }
-    };
-    Ok(rsa_pub_key)
+fn public_key_from_pem(pem: String) -> Result<RS256PublicKey, TagentError> {
+    Ok(RS256PublicKey::from_pem(&insert_line_breaks_pub_key(pem)?)
+        .map_err(|err| TagentError::from(format!("Invalid key: {}", err)))?)
 }
 
 // Configuration management
@@ -172,6 +92,7 @@ const VAR_PREFIX: &str = "TAGENT";
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct TagentConfig {
     pub root_directory: PathBuf,
+    pub public_key_url: String,
     pub public_key: Option<String>,
     pub address: String,
     pub port: i16,
@@ -181,6 +102,7 @@ impl TagentConfig {
     pub fn new() -> Result<Self, TagentError> {
         Ok(TagentConfig {
             root_directory: dirs::home_dir().ok_or("couldn't get user's home directory")?,
+            public_key_url: String::from("https://admin.tapis.io/v3/tenants/admin"),
             public_key: None,
             address: String::from("127.0.0.1"),
             port: 8080,
@@ -215,6 +137,17 @@ impl TagentConfig {
             .try_deserialize::<TagentConfig>()?;
         Ok(settings)
     }
+
+    pub async fn get_public_key(&self) -> Result<RS256PublicKey, TagentError> {
+        match &self.public_key {
+            Some(v) => public_key_from_pem(v.clone()),
+            None => self.fetch_public_key().await,
+        }
+    }
+
+    async fn fetch_public_key(&self) -> Result<RS256PublicKey, TagentError> {
+        public_key_from_pem(fetch_publickey(&self.public_key_url).await?)
+    }
 }
 
 #[cfg(test)]
@@ -223,35 +156,35 @@ mod test {
 
     use super::*;
 
-    #[actix_rt::test]
-    async fn get_pub_key_with_key_var() -> std::io::Result<()> {
-        std::env::set_var("TAGENT_PUB_KEY", "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAneCSAKpfuRxX7DpuBBoYEhIayF6yGppgR3I6jO1cvN0+6gc36wHo3O93bnfNl2cYSmbpp9dtd1T2Uv1t5DCGe+s2bd/VwfO6IgMu2GuHHkQcTqTJb0axIJftqo5lfopSOvyeN5oEo/ti7fw0hCdzArQhcTtkaU4m5spL7+5XUOnFiwPZB+unxGVVQ5rmI9TVW74iNZ4ESlzRTp2VT0sZ6QIIOBZA2kLx+fgg3YQuZpZ4rz6oJ8zyWEik+v14Rm6AUBI1XTyVXDr2KJZpXJ5cVCW/xIua4Z97woKZJ1qk7rL/PrN2iT7/6bM35rVFU3kTvZKfXRPTE8ZWTiWGWAFu+QIDAQAB\n-----END PUBLIC KEY-----");
-        let _a = get_pub_key().await.unwrap();
+    // #[actix_rt::test]
+    // async fn get_pub_key_with_key_var() -> std::io::Result<()> {
+    //     std::env::set_var("TAGENT_PUB_KEY", "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAneCSAKpfuRxX7DpuBBoYEhIayF6yGppgR3I6jO1cvN0+6gc36wHo3O93bnfNl2cYSmbpp9dtd1T2Uv1t5DCGe+s2bd/VwfO6IgMu2GuHHkQcTqTJb0axIJftqo5lfopSOvyeN5oEo/ti7fw0hCdzArQhcTtkaU4m5spL7+5XUOnFiwPZB+unxGVVQ5rmI9TVW74iNZ4ESlzRTp2VT0sZ6QIIOBZA2kLx+fgg3YQuZpZ4rz6oJ8zyWEik+v14Rm6AUBI1XTyVXDr2KJZpXJ5cVCW/xIua4Z97woKZJ1qk7rL/PrN2iT7/6bM35rVFU3kTvZKfXRPTE8ZWTiWGWAFu+QIDAQAB\n-----END PUBLIC KEY-----");
+    //     let _a = get_pub_key().await.unwrap();
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
-    #[actix_rt::test]
-    async fn get_pub_key_with_url_var() -> std::io::Result<()> {
-        std::env::remove_var("TAGENT_PUB_KEY");
-        std::env::set_var(
-            "TAGENT_PUB_KEY_URL",
-            "https://admin.tapis.io/v3/tenants/admin",
-        );
-        // note: this test can fail if Tapis API is not available..
-        let _a = get_pub_key().await.unwrap();
+    // #[actix_rt::test]
+    // async fn get_pub_key_with_url_var() -> std::io::Result<()> {
+    //     std::env::remove_var("TAGENT_PUB_KEY");
+    //     std::env::set_var(
+    //         "TAGENT_PUB_KEY_URL",
+    //         "https://admin.tapis.io/v3/tenants/admin",
+    //     );
+    //     // note: this test can fail if Tapis API is not available..
+    //     let _a = get_pub_key().await.unwrap();
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
-    #[actix_rt::test]
-    async fn get_pub_key_should_fail_if_no_vars() -> std::io::Result<()> {
-        std::env::remove_var("TAGENT_PUB_KEY");
-        std::env::remove_var("TAGENT_PUB_KEY_URL");
-        let a = get_pub_key().await;
-        assert!(a.is_err());
-        Ok(())
-    }
+    // #[actix_rt::test]
+    // async fn get_pub_key_should_fail_if_no_vars() -> std::io::Result<()> {
+    //     std::env::remove_var("TAGENT_PUB_KEY");
+    //     std::env::remove_var("TAGENT_PUB_KEY_URL");
+    //     let a = get_pub_key().await;
+    //     assert!(a.is_err());
+    //     Ok(())
+    // }
 
     #[test]
     fn config_defaults_should_load_first() -> std::io::Result<()> {

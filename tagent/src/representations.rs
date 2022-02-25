@@ -64,6 +64,12 @@ impl From<&str> for TagentError {
     }
 }
 
+impl From<String> for TagentError {
+    fn from(message: String) -> Self {
+        TagentError::new_with_version(message)
+    }
+}
+
 impl From<TagentError> for std::io::Error {
     fn from(tagent_error: TagentError) -> Self {
         std::io::Error::new(
@@ -73,6 +79,18 @@ impl From<TagentError> for std::io::Error {
                 tagent_error.message, tagent_error.version
             ),
         )
+    }
+}
+
+impl From<std::io::Error> for TagentError {
+    fn from(error: std::io::Error) -> Self {
+        TagentError::new_with_version(format!("IO Error: {}", error))
+    }
+}
+
+impl From<reqwest::Error> for TagentError {
+    fn from(error: reqwest::Error) -> Self {
+        TagentError::new_with_version(format!("Request Error: {}", error))
     }
 }
 
