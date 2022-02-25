@@ -42,7 +42,7 @@ pub struct FileUploadRsp {
 }
 
 // The Error type that can convert to a actix_web::HttpResponse
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct TagentError {
     message: String,
     version: String,

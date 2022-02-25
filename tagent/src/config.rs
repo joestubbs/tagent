@@ -4,6 +4,7 @@ use config::Config;
 use jwt_simple::algorithms::RS256PublicKey;
 use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
+use std::future::Future;
 
 use crate::representations::TagentError;
 
@@ -79,8 +80,8 @@ fn insert_line_breaks_pub_key(pub_key: String) -> std::io::Result<String> {
 }
 
 fn public_key_from_pem(pem: String) -> Result<RS256PublicKey, TagentError> {
-    Ok(RS256PublicKey::from_pem(&insert_line_breaks_pub_key(pem)?)
-        .map_err(|err| TagentError::from(format!("Invalid key: {}", err)))?)
+    RS256PublicKey::from_pem(&insert_line_breaks_pub_key(pem)?)
+        .map_err(|err| TagentError::from(format!("Invalid key: {}", err)))
 }
 
 // Configuration management
@@ -139,14 +140,21 @@ impl TagentConfig {
     }
 
     pub async fn get_public_key(&self) -> Result<RS256PublicKey, TagentError> {
-        match &self.public_key {
-            Some(v) => public_key_from_pem(v.clone()),
-            None => self.fetch_public_key().await,
-        }
+        self.get_public_key_with_default(fetch_publickey).await
     }
 
-    async fn fetch_public_key(&self) -> Result<RS256PublicKey, TagentError> {
-        public_key_from_pem(fetch_publickey(&self.public_key_url).await?)
+    async fn get_public_key_with_default<'a, F, Fut>(
+        &'a self,
+        retriever: F,
+    ) -> Result<RS256PublicKey, TagentError>
+    where
+        F: Fn(&'a str) -> Fut,
+        Fut: Future<Output = Result<String, TagentError>> + 'a,
+    {
+        public_key_from_pem(match &self.public_key {
+            Some(v) => v.clone(),
+            None => retriever(&self.public_key_url).await?,
+        })
     }
 }
 
@@ -156,35 +164,31 @@ mod test {
 
     use super::*;
 
-    // #[actix_rt::test]
-    // async fn get_pub_key_with_key_var() -> std::io::Result<()> {
-    //     std::env::set_var("TAGENT_PUB_KEY", "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAneCSAKpfuRxX7DpuBBoYEhIayF6yGppgR3I6jO1cvN0+6gc36wHo3O93bnfNl2cYSmbpp9dtd1T2Uv1t5DCGe+s2bd/VwfO6IgMu2GuHHkQcTqTJb0axIJftqo5lfopSOvyeN5oEo/ti7fw0hCdzArQhcTtkaU4m5spL7+5XUOnFiwPZB+unxGVVQ5rmI9TVW74iNZ4ESlzRTp2VT0sZ6QIIOBZA2kLx+fgg3YQuZpZ4rz6oJ8zyWEik+v14Rm6AUBI1XTyVXDr2KJZpXJ5cVCW/xIua4Z97woKZJ1qk7rL/PrN2iT7/6bM35rVFU3kTvZKfXRPTE8ZWTiWGWAFu+QIDAQAB\n-----END PUBLIC KEY-----");
-    //     let _a = get_pub_key().await.unwrap();
+    #[actix_rt::test]
+    async fn get_public_key_from_default_if_provided() -> std::io::Result<()> {
+        let mut t = TagentConfig::new()?;
+        t.public_key = Some(String::from("-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAneCSAKpfuRxX7DpuBBoYEhIayF6yGppgR3I6jO1cvN0+6gc36wHo3O93bnfNl2cYSmbpp9dtd1T2Uv1t5DCGe+s2bd/VwfO6IgMu2GuHHkQcTqTJb0axIJftqo5lfopSOvyeN5oEo/ti7fw0hCdzArQhcTtkaU4m5spL7+5XUOnFiwPZB+unxGVVQ5rmI9TVW74iNZ4ESlzRTp2VT0sZ6QIIOBZA2kLx+fgg3YQuZpZ4rz6oJ8zyWEik+v14Rm6AUBI1XTyVXDr2KJZpXJ5cVCW/xIua4Z97woKZJ1qk7rL/PrN2iT7/6bM35rVFU3kTvZKfXRPTE8ZWTiWGWAFu+QIDAQAB\n-----END PUBLIC KEY-----"));
+        async fn retriever(_s: &str) -> Result<String, TagentError> {
+            Err(TagentError::from(""))
+        }
+        let key = t.get_public_key_with_default(retriever).await?;
+        let components = key.to_components();
+        assert_eq!(components.n[0], 157);
+        assert_eq!(components.e, vec![1,0,1]);
+        Ok(())
+    }
 
-    //     Ok(())
-    // }
-
-    // #[actix_rt::test]
-    // async fn get_pub_key_with_url_var() -> std::io::Result<()> {
-    //     std::env::remove_var("TAGENT_PUB_KEY");
-    //     std::env::set_var(
-    //         "TAGENT_PUB_KEY_URL",
-    //         "https://admin.tapis.io/v3/tenants/admin",
-    //     );
-    //     // note: this test can fail if Tapis API is not available..
-    //     let _a = get_pub_key().await.unwrap();
-
-    //     Ok(())
-    // }
-
-    // #[actix_rt::test]
-    // async fn get_pub_key_should_fail_if_no_vars() -> std::io::Result<()> {
-    //     std::env::remove_var("TAGENT_PUB_KEY");
-    //     std::env::remove_var("TAGENT_PUB_KEY_URL");
-    //     let a = get_pub_key().await;
-    //     assert!(a.is_err());
-    //     Ok(())
-    // }
+    #[actix_rt::test]
+    async fn should_try_fetch_if_public_key_not_provided() -> std::io::Result<()> {
+        let mut t = TagentConfig::new()?;
+        t.public_key = None;
+        async fn retriever(_s: &str) -> Result<String, TagentError> {
+            Err(TagentError::from("foo bar"))
+        }
+        let key = t.get_public_key_with_default(retriever).await;
+        assert_eq!(key.expect_err(""), TagentError::from("foo bar"));
+        Ok(())
+    }
 
     #[test]
     fn config_defaults_should_load_first() -> std::io::Result<()> {
