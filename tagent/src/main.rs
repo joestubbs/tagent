@@ -40,6 +40,7 @@ async fn main() -> std::io::Result<()> {
     let root_dir = settings.root_directory.clone();
     info!("tagent version {}", app_version);
     info!("tagent running with root directory: {:?}", &root_dir);
+    info!("tagent serving at {}:{}", settings.address, settings.port);
     let pub_key = settings.get_public_key().await?;
     let app_state = representations::AppState {
         app_version,
