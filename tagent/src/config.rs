@@ -169,7 +169,7 @@ pub async fn get_pub_key() -> std::io::Result<RS256PublicKey> {
 const CONFIG_FILE: &str = "tagent/settings.yaml";
 const VAR_PREFIX: &str = "TAGENT";
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct TagentConfig {
     pub root_directory: PathBuf,
     pub public_key: Option<String>,
@@ -219,6 +219,8 @@ impl TagentConfig {
 
 #[cfg(test)]
 mod test {
+    use std::io::Write;
+
     use super::*;
 
     #[actix_rt::test]
@@ -248,6 +250,47 @@ mod test {
         std::env::remove_var("TAGENT_PUB_KEY_URL");
         let a = get_pub_key().await;
         assert!(a.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn config_defaults_should_load_first() -> std::io::Result<()> {
+        let temp = tempfile::TempDir::new()?;
+        // Ensure no file or variables exist, for obtaining the default values
+        let file = temp.path().join("foo.yaml");
+        let filename = file.to_str().unwrap();
+        let prefix = uuid::Uuid::new_v4().to_string();
+        let config = TagentConfig::from_sources_with_names(filename, &prefix)?;
+        assert_eq!(config, TagentConfig::new()?);
+        Ok(())
+    }
+
+    #[test]
+    fn config_should_read_file_if_it_exists() -> std::io::Result<()> {
+        let temp = tempfile::TempDir::new()?;
+        let filename = temp.path().join("foo.yaml");
+        let mut file = std::fs::File::create(&filename)?;
+        let contents = "root_directory: foo\nport: 12";
+        file.write_all(contents.as_bytes())?;
+        let prefix = uuid::Uuid::new_v4().to_string();
+        let config = TagentConfig::from_sources_with_names(filename.to_str().unwrap(), &prefix)?;
+        assert_eq!(config.root_directory.to_str().unwrap(), "foo");
+        assert_eq!(config.port, 12);
+        Ok(())
+    }
+
+    #[test]
+    fn config_should_read_environment_variables() -> std::io::Result<()> {
+        let temp = tempfile::TempDir::new()?;
+        // Ensure no file or variables exist, for obtaining the default values
+        let file = temp.path().join("foo.yaml");
+        let filename = file.to_str().unwrap();
+        let prefix = uuid::Uuid::new_v4().to_string();
+        std::env::set_var(format!("{}_ROOT_DIRECTORY", &prefix), "bar");
+        std::env::set_var(format!("{}_PORT", &prefix), "15");
+        let config = TagentConfig::from_sources_with_names(filename, &prefix)?;
+        assert_eq!(config.root_directory.to_str().unwrap(), "bar");
+        assert_eq!(config.port, 15);
         Ok(())
     }
 }
