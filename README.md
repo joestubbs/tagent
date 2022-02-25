@@ -146,3 +146,85 @@ $ curl -H "content-type: application/json" -d '{"subject": "tenants@admin", "act
   "version": "0.1.0"
 }
 ```
+
+7. List all acls
+
+```
+$ curl  -H "x-tapis-token: $jwt" localhost:8080/acls
+
+{
+  "message": "ACLs retrieved successfully.",
+  "status": "success",
+  "version": "0.1.0",
+  "result": [
+    {
+      "id": 1,
+      "subject": "tenants@admin",
+      "action": "Write",
+      "path": "/*",
+      "user": "self",
+      "decision": "Allow",
+      "create_by": "tenants@admin",
+      "create_time": "2022-02-23T04:59:53.721885536+00:00"
+    },
+    {
+      "id": 2,
+      "subject": "files@admin",
+      "action": "Write",
+      "path": "/files/*",
+      "user": "self",
+      "decision": "Allow",
+      "create_by": "tenants@admin",
+      "create_time": "2022-02-23T05:02:49.315917222+00:00"
+    },
+  ]
+}
+```
+
+8. Retrieve an ACL by id
+
+```
+$ curl  -H "x-tapis-token: $jwt" localhost:8080/acls/2
+{
+  "message": "ACL retrieved successfully.",
+  "status": "success",
+  "version": "0.1.0",
+  "result": {
+    "id": 2,
+    "subject": "files@admin",
+    "action": "Write",
+    "path": "/files/*",
+    "user": "self",
+    "decision": "Allow",
+    "create_by": "tenants@admin",
+    "create_time": "2022-02-23T05:02:49.315917222+00:00"
+  }
+}
+```
+
+9. Delete an ACL by id:
+
+```
+$ curl  -H "x-tapis-token: $jwt" localhost:8080/acls/2 -X DELETE
+
+{
+  "message": "ACL deleted successfully.",
+  "status": "success",
+  "result": "none",
+  "version": "0.1.0"
+}
+```
+
+10. Update an ACL by id:
+
+```
+$ curl -H "x-tapis-token: $jwt" localhost:8080/acls/3 -X PUT -H "content-type: application/json" -d '{"subject": "jobs@admin", "action": "Write", "path": "/*", "user": "self", "decision": "Allow"}'
+
+{
+  "message": "ACL updated successfully.",
+  "status": "success",
+  "result": "none",
+  "version": "0.1.0"
+}
+```
+

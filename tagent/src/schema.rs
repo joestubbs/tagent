@@ -7,5 +7,6 @@ table! {
         user -> Text,
         create_by -> Text,
         create_time -> Text,
+        decision -> Text,
     }
 }

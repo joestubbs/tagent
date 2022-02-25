@@ -27,27 +27,21 @@ pub struct ErrorRsp {
 }
 
 #[derive(Serialize)]
-pub struct CreateAclRsp {
+pub struct AclStringRsp {
     pub message: String,
     pub status: String,
     pub result: String,
     pub version: String,
 }
 
-#[derive(Serialize)]
-pub struct FileListingRsp {
-    pub message: String,
-    pub status: String,
-    pub version: String,
-    pub result: Vec<String>,
-}
-
 #[derive(Debug, Serialize)]
 pub struct Acl {
+    pub id: i32,
     pub subject: String,
     pub action: String,
     pub path: String,
     pub user: String,
+    pub decision: String,
     pub create_by: String,
     pub create_time: String,
 }
@@ -55,10 +49,12 @@ pub struct Acl {
 impl Acl {
     pub fn from_db_acl(db_acl: &DbAcl) -> Self {
         Acl {
+            id: db_acl.id.clone(),
             subject: db_acl.subject.clone(),
             action: db_acl.action.clone(),
             path: db_acl.path.clone(),
             user: db_acl.user.clone(),
+            decision: db_acl.decision.clone(),
             create_by: db_acl.create_by.clone(),
             create_time: db_acl.create_time.clone(),
         }
@@ -71,6 +67,23 @@ pub struct AclListingRsp {
     pub status: String,
     pub version: String,
     pub result: Vec<Acl>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AclByIdRsp {
+    pub message: String,
+    pub status: String,
+    pub version: String,
+    pub result: Acl,
+
+}
+
+#[derive(Serialize)]
+pub struct FileListingRsp {
+    pub message: String,
+    pub status: String,
+    pub version: String,
+    pub result: Vec<String>,
 }
 
 #[derive(Serialize)]
