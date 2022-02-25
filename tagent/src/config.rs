@@ -180,7 +180,7 @@ pub struct TagentConfig {
 impl TagentConfig {
     pub fn new() -> Result<Self, TagentError> {
         Ok(TagentConfig {
-            root_directory: dirs::home_dir().ok_or_else(|| "couldn't get user's home directory")?,
+            root_directory: dirs::home_dir().ok_or("couldn't get user's home directory")?,
             public_key: None,
             address: String::from("127.0.0.1"),
             port: 8080,
@@ -196,11 +196,11 @@ impl From<config::ConfigError> for TagentError {
 
 impl TagentConfig {
     pub fn from_sources() -> Result<Self, TagentError> {
-        let mut config = dirs::config_dir().ok_or_else(|| "couldn't get config directory")?;
+        let mut config = dirs::config_dir().ok_or("couldn't get config directory")?;
         config.push(CONFIG_FILE);
         let config_path = config
             .to_str()
-            .ok_or_else(|| "path to config file cannot be converted to string")?;
+            .ok_or("path to config file cannot be converted to string")?;
         Self::from_sources_with_names(config_path, VAR_PREFIX)
     }
 
