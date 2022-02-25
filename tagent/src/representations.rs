@@ -52,6 +52,16 @@ impl TagentError {
     pub fn new(message: String, version: String) -> Self {
         TagentError { message, version }
     }
+
+    pub fn new_with_version(message: String) -> Self {
+        Self::new(message, String::from(env!("CARGO_PKG_VERSION")))
+    }
+}
+
+impl From<&str> for TagentError {
+    fn from(message: &str) -> Self {
+        TagentError::new_with_version(String::from(message))
+    }
 }
 
 impl fmt::Display for TagentError {
