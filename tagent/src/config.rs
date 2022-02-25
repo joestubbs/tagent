@@ -164,20 +164,48 @@ pub async fn get_pub_key() -> std::io::Result<RS256PublicKey> {
 // Configuration management
 // ========================
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct TagentConfig {
     pub foo: String,
     pub bar: i32,
     pub baz: Option<String>,
 }
 
-pub fn read_config() -> Result<TagentConfig, TagentError> {
-    let settings = Config::builder()
-        .add_source(config::File::with_name("settings.yaml"))
-        .add_source(config::Environment::with_prefix("TAGENT")).build().unwrap();
-    let a = settings.try_deserialize::<TagentConfig>();
-    dbg!(&a);
-    Ok(a.unwrap())
+impl Default for TagentConfig {
+    fn default() -> Self {
+        TagentConfig {
+            foo: String::from("foo"),
+            bar: 1i32,
+            baz: Some(String::from("baz")),
+        }
+    }
+}
+
+impl From<config::ConfigError> for TagentError {
+    fn from(config_error: config::ConfigError) -> Self {
+        TagentError::new_with_version(format!("Configuration error: {}", config_error))
+    }
+}
+
+impl TagentConfig {
+    pub fn from_sources() -> Result<Self, TagentError> {
+        let mut config = dirs::home_dir().ok_or_else(|| "couldn't get user's home directory")?;
+        config.push(".tagent.yaml");
+        let config_path = config
+            .to_str()
+            .ok_or_else(|| "path to config file cannot be converted to string")?;
+        Self::from_sources_with_names(config_path, "TAGENT")
+    }
+
+    fn from_sources_with_names(file: &str, var_prefix: &str) -> Result<Self, TagentError> {
+        let settings = Config::builder()
+            .add_source(config::Config::try_from::<TagentConfig>(&Default::default())?)
+            .add_source(config::File::with_name(file))
+            .add_source(config::Environment::with_prefix(var_prefix))
+            .build()?
+            .try_deserialize::<TagentConfig>()?;
+        Ok(settings)
+    }
 }
 
 #[cfg(test)]
