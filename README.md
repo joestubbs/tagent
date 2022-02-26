@@ -143,7 +143,7 @@ $ curl -F upload=@up.txt localhost:8080/files/contents/rust/tmp/up.txt -v | jq
 Each ACL specifies whether an authenticated subject is authorized (decision: ``Allow``) or not authorized (decision: ``Deny``)
 to perform certain requests. There are 5 aspects to an ACL:
 
-  * ``subject`` -- The subject of the ACL. This must be an exact match to the subject making the request for the
+  * ``subject`` -- The subject of the ACL. This must be an exact match to the subject making the request for the ACL to apply.
   * ``action`` -- The action being taken. This can be one of ``Read``, ``Execute`` or ``Write``. The actions are ordered:
      ``Read`` is less than ``Execute`` and ``Execute`` is less than ``Write``. 
   * ``path`` -- The URL path associated with the ACL. This can be a string literal or it can contain a regular expression.
@@ -164,7 +164,7 @@ does not detect such instances, but in a future version it will.
 
 Examples
 
-1. Create a new ACL giving write access to the ``/tmp/testup.txt`` path.
+1. Create an ``Allow`` ACL giving write access to the ``/tmp/testup.txt`` path to the ``tenants@admin`` subject.
 
 ```
 $ curl -H "content-type: application/json" -d '{"subject": "tenants@admin", "action": "Write", "user": "self", "path": "`/tmp/testup.txt", "decision": "Allow"}'  -H "x-tapis-token: $jwt" localhost:8080/acls |jq
@@ -178,7 +178,7 @@ $ curl -H "content-type: application/json" -d '{"subject": "tenants@admin", "act
 ```
 
 2. Create an ``Allow`` ACL with a wild card that matches any files in the root directory with an extension of ``.txt``. Note that 
-we use a regular expression syntax here, where the ".*" matches any characters.
+we use a regular expression syntax here, where the ``.*`` matches any characters.
 ```
 $ curl -H "content-type: application/json" -d '{"subject": "tenants@admin", "action": "Write", "user": "self", "path": "/.*.txt", "decision": "Allow"}'  -H "x-tapis-token: $jwt" localhost:8080/acls|jq
 
