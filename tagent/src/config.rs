@@ -22,12 +22,12 @@ struct TenantsAPIResponse {
 }
 
 /// Fetch the public key from a GET request to a uri.
-/// 
+///
 /// It returns a string containing the key in PEM format.
-/// 
+///
 /// In practice, `uri` will be the Tapis tenants API endpoint:
 /// <https://admin.tapis.io/v3/tenants/admin>.
-/// 
+///
 async fn fetch_publickey(uri: &str) -> Result<String, TagentError> {
     let res = reqwest::get(uri).await?;
     match res.status() {
@@ -92,31 +92,31 @@ fn public_key_from_pem(pem: String) -> Result<RS256PublicKey, TagentError> {
 // ========================
 
 /// Settings file.
-/// 
+///
 /// Default location for the settings file. The config directory comes from the standard
 /// location for configuration files for the OS.
-/// 
+///
 /// For example, for Linux the location is `~/.config/tagent/settings.yaml`.
-/// 
+///
 const CONFIG_FILE: &str = "tagent/settings.yaml";
 
 /// Environment variables prefix.
-/// 
+///
 /// This prefix gets added to the field names of TagentConfig to retrieve defaults from
 /// environment variables.  The environment variables override the defaults and the
 /// values from the settings file.
-/// 
+///
 /// For example, the environment variable `TAGENT_ROOT_DIRECTORY` overrides the field
 /// `root_directory` from TagentConfig defaults and from the settings file.
-/// 
+///
 const VAR_PREFIX: &str = "TAGENT";
 
 /// Configuration structure.
-/// 
+///
 /// For adding new properties:
 /// - Add a field to `TagentConfig`, and
 /// - Add a default to `TagentConfig::new()`.
-/// 
+///
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct TagentConfig {
     pub root_directory: PathBuf,
@@ -149,10 +149,10 @@ impl From<config::ConfigError> for TagentError {
 
 impl TagentConfig {
     /// Build a `TagentConfig`.
-    /// 
+    ///
     /// Exercise `from_sources_with_names` with the default values for the settings file
     /// and for the prefix of the environment variables.
-    /// 
+    ///
     pub fn from_sources() -> Result<Self, TagentError> {
         let mut config = dirs::config_dir().ok_or("couldn't get config directory")?;
         config.push(CONFIG_FILE);
@@ -163,14 +163,14 @@ impl TagentConfig {
     }
 
     /// Build a `TagentConfig`.
-    /// 
+    ///
     /// Read the following sources in order:
     /// - Defaults: from the constructor `TagentConfig::new()`,
     /// - Settings file (`file`),
     /// - Environment variables (prefixed with `var_prefix`).
-    /// 
+    ///
     /// The file and the variables are optional.
-    /// 
+    ///
     fn from_sources_with_names(file: &str, var_prefix: &str) -> Result<Self, TagentError> {
         let settings = Config::builder()
             .add_source(config::Config::try_from::<TagentConfig>(
@@ -184,19 +184,19 @@ impl TagentConfig {
     }
 
     /// Get public key.
-    /// 
+    ///
     /// Exercise `public_key_with_default`, using a function `retriever` that fetches a
     /// key from the URL specified in the field `public_key_url`.
-    /// 
+    ///
     pub async fn get_public_key(&self) -> Result<RS256PublicKey, TagentError> {
         self.get_public_key_with_default(fetch_publickey).await
     }
 
     /// Get public key.
-    /// 
+    ///
     /// Use the `public_key` field of `TagentConfig` if it is not `None`.
     /// Otherwise, use the function `retriever` to fetch a public key.
-    /// 
+    ///
     async fn get_public_key_with_default<'a, F, Fut>(
         &'a self,
         retriever: F,
