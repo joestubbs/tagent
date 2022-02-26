@@ -30,8 +30,8 @@ fn make_config(app_data: web::Data<representations::AppState>) -> impl FnOnce(&m
                 .service(handlers::delete_acl_by_id)
                 .service(handlers::update_acl_by_id)
                 .service(handlers::get_acls_for_subject)
-                .service(handlers::get_acls_for_service_user)
-                .service(handlers::is_authz_service_user_path)
+                .service(handlers::get_acls_for_subject_user)
+                .service(handlers::is_authz_subject_user_action_path)
                 // files routes ----
                 .service(handlers::list_files_path)
                 .service(handlers::get_file_contents_path)

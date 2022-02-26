@@ -48,6 +48,28 @@ pub struct DbAcl {
     pub decision: String,
 }
 
+impl DbAcl {
+    // determines whether a DbAcl represents a lower action than a given action
+    pub fn is_leq_action(&self, action: &str) -> bool {
+        if self.action == "Read" {
+            // Read is less than every action
+            return true;
+        }
+        else if self.action == "Execute" {
+            if (action == "Execute") || (action == "Write") {
+                return true;
+            }
+        }
+        else {
+            // acl action is Write, so only Write is leq..
+            if action == "Write" {
+                return true;
+            }
+        }
+        false        
+    }
+}
+
 // struct representing an ACL row to insert into sqlite the id attribute is not included
 #[derive(Debug, Insertable)]
 #[table_name = "acls"]

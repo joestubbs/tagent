@@ -2129,6 +2129,7 @@ dependencies = [
  "futures",
  "jwt-simple",
  "log",
+ "regex",
  "reqwest",
  "rsa",
  "sanitize-filename",

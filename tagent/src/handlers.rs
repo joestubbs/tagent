@@ -1,6 +1,6 @@
 use actix_files::NamedFile;
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder, Result};
-use log::{debug, info, warn};
+use log::{debug, info, warn, error};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -10,10 +10,12 @@ use futures::{StreamExt, TryStreamExt};
 
 use uuid::Uuid;
 
+use crate::models::AclAction;
+
 use super::auth::get_subject_of_request;
 use super::db::{
     delete_acl_from_db_by_id, establish_connection, retrieve_acl_by_id, retrieve_all_acls,
-    save_acl, update_acl_in_db_by_id,
+    save_acl, update_acl_in_db_by_id, retrieve_acls_for_subject, retrieve_acls_for_subject_user, is_authz_db
 };
 use super::models::NewAclJson;
 use super::representations::{
@@ -54,6 +56,7 @@ pub async fn create_acl(
             return Err(TagentError::new(msg, version.to_string()));
         }
     };
+    
     let mut conn = establish_connection();
     let r = save_acl(
         &mut conn,
@@ -256,22 +259,161 @@ pub async fn update_acl_by_id(
     Ok(web::Json(rsp))
 }
 
-#[get("/acls/{subject}")]
-pub async fn get_acls_for_subject() -> impl Responder {
-    "todo: get_acls_for_subject".to_string()
+#[get("/acls/subject/{subject}")]
+pub async fn get_acls_for_subject(
+    _req: HttpRequest,
+    app_state: web::Data<AppState>,
+    path: web::Path<(String,)>)
+    -> Result<impl Responder, TagentError> {
+    let version = &app_state.get_ref().app_version;
+    let pub_key = &app_state.get_ref().pub_key;
+
+    let sub = &path.0;
+
+    debug!("processing request to GET /acls/subject/{}", sub);
+    let subject = get_subject_of_request(_req, pub_key).await;
+    let _subject = match subject {
+        Ok(sub) => sub,
+        Err(error) => {
+            let msg = format!("got an error from get_subject_of_request; error: {}", error);
+            info!("{}", msg);
+            return Err(TagentError::new(msg, version.to_string()));
+        }
+    };
+    let mut conn = establish_connection();
+    let results = retrieve_acls_for_subject(&mut conn, &sub);
+    let results = match results {
+        Ok(r) => r,
+        Err(e) => {
+            let msg = format!("Could not retrieve ACLs for subject {}; details: {}", sub, e);
+            debug!("{}", msg);
+            return Err(TagentError::new(msg, version.to_string()));
+        }
+    };
+
+    let mut acls = Vec::<Acl>::new();
+    for a in &results {
+        acls.push(Acl::from_db_acl(a));
+    }
+
+    let rsp = AclListingRsp {
+        status: String::from("success"),
+        message: "ACLs retrieved successfully.".to_string(),
+        result: acls,
+        version: version.to_string(),
+    };
+
+    Ok(web::Json(rsp))
 }
 
-#[get("/acls/{service}/{user}")]
-pub async fn get_acls_for_service_user() -> impl Responder {
-    "todo: get_acls_for_service_user".to_string()
+#[get("/acls/subject/{subject}/{user}")]
+pub async fn get_acls_for_subject_user(_req: HttpRequest,
+    app_state: web::Data<AppState>,
+    path: web::Path<(String, String)>)
+    -> Result<impl Responder, TagentError> {
+    let version = &app_state.get_ref().app_version;
+    let pub_key = &app_state.get_ref().pub_key;
+
+    let sub = &path.0;
+    let user = &path.1;
+
+    debug!("processing request to GET /acls/subject/{}/{}", sub, user);
+    let subject = get_subject_of_request(_req, pub_key).await;
+    let _subject = match subject {
+        Ok(sub) => sub,
+        Err(error) => {
+            let msg = format!("got an error from get_subject_of_request; error: {}", error);
+            info!("{}", msg);
+            return Err(TagentError::new(msg, version.to_string()));
+        }
+    };
+    let mut conn = establish_connection();
+    let results = retrieve_acls_for_subject_user(&mut conn, &sub, &user);
+    let results = match results {
+        Ok(r) => r,
+        Err(e) => {
+            let msg = format!("Could not retrieve ACLs for subject {}; details: {}", sub, e);
+            debug!("{}", msg);
+            return Err(TagentError::new(msg, version.to_string()));
+        }
+    };
+
+    let mut acls = Vec::<Acl>::new();
+    for a in &results {
+        acls.push(Acl::from_db_acl(a));
+    }
+
+    let rsp = AclListingRsp {
+        status: String::from("success"),
+        message: "ACLs retrieved successfully.".to_string(),
+        result: acls,
+        version: version.to_string(),
+    };
+
+    Ok(web::Json(rsp))
 }
 
-#[get("/acls/isauthz/{service}/{user}/{path:.*}")]
-pub async fn is_authz_service_user_path() -> impl Responder {
-    "todo: is_authz_service_user_path".to_string()
+#[get("/acls/isauthz/{subject}/{user}/{action}/{path:.*}")]
+pub async fn is_authz_subject_user_action_path(
+    _req: HttpRequest,
+    app_state: web::Data<AppState>,
+    path: web::Path<(String, String, AclAction, PathBuf)>) 
+    -> Result<impl Responder, TagentError> {
+
+        let version = &app_state.get_ref().app_version;
+        let pub_key = &app_state.get_ref().pub_key;
+    
+        let sub = &path.0;
+        let usr = &path.1;
+        let act = &path.2;
+        let pth = &path.3;
+
+        // all paths start with a slash
+        let mut check_path = String::from('/');
+        let pth_str = path_buf_to_string(pth.to_path_buf());
+        let pth_str = match pth_str {
+            Some(p) => p,
+            None => {
+                let msg = format!("Could not parse path variable in URL.");
+                error!("{}", msg);
+                return Err(TagentError::new(msg, version.to_string()));
+            }
+        };
+
+        if !(pth_str.starts_with('/')) {
+            check_path.push_str(&pth_str);
+        } else{
+            check_path = pth_str.to_string();
+        }
+
+        debug!("processing request to GET /acls/isauthz/{}/{}/{}/{:#?}", sub, usr, act, check_path);
+        
+        let subject = get_subject_of_request(_req, pub_key).await;
+        let _subject = match subject {
+            Ok(sub) => sub,
+            Err(error) => {
+                let msg = format!("got an error from get_subject_of_request; error: {}", error);
+                info!("{}", msg);
+                return Err(TagentError::new(msg, version.to_string()));
+            }
+        };
+
+        let mut conn = establish_connection();
+        let result = is_authz_db(&mut conn, sub, usr, &check_path, act);
+
+        let rsp = AclStringRsp {
+        status: String::from("success"),
+        message: "Result of authz check returned".to_string(),
+        result: result.to_string(),
+        version: version.to_string(),
+    };
+
+    Ok(web::Json(rsp))
+
 }
 
 // Utils
+// TODO -- move these utils functions to a separate module?
 
 // Returns None if the input is not valid UTF-8.
 pub fn path_buf_to_str(input: &Path) -> Option<&str> {
@@ -289,6 +431,7 @@ fn path_to_string(input: &Path) -> std::io::Result<String> {
     })
 }
 
+// TODO -- move to config.rs?
 pub(crate) fn get_root_dir() -> std::io::Result<String> {
     std::env::var("TAGENT_HOME")
         .or_else( |_| {warn!("TAGENT_HOME not set; using current working directory!"); std::env::current_dir()}
@@ -321,6 +464,8 @@ pub fn get_local_listing(full_path: PathBuf) -> Vec<String> {
     result
 }
 
+// TODO -- remove type alias?
+// TODO -- should these retuen Impl Responder like the ACL endpoints?
 type FileListHttpRsp = Result<web::Json<FileListingRsp>, TagentError>;
 
 #[get("/files/list/{path:.*}")]
@@ -333,6 +478,7 @@ pub async fn list_files_path(
     let root_dir = &app_state.get_ref().root_dir;
     let pub_key = &app_state.get_ref().pub_key;
     let params = params.into_inner();
+    // TODO -- specify PathBuf type in function signature?
     let path = params.0;
     debug!("processing request to GET /files/list/{}", path);
     let subject = get_subject_of_request(_req, pub_key).await;
@@ -352,7 +498,7 @@ pub async fn list_files_path(
     }
     if !full_path.exists() {
         let message = format!(
-            "Invalid path; path {:?} does not exist",
+            "Invalid path; path {:#?} does not exist",
             path_buf_to_str(&full_path)
         );
         return Err(TagentError::new(message, version.to_string()));
@@ -368,7 +514,7 @@ pub async fn list_files_path(
     Ok(web::Json(r))
 }
 
-// type FileContentsHttpRsp = Either<HttpResponse, Result<NamedFile>>;
+// TODO -- remove?
 type FileContentsHttpRsp = Result<HttpResponse, TagentError>;
 
 #[get("/files/contents/{path:.*}")]
@@ -386,7 +532,7 @@ pub async fn get_file_contents_path(
     let mut message = String::from("There was an error");
     full_path.push(path);
     if !full_path.exists() {
-        message = format!("Invalid path; path {:?} does not exist", &full_path);
+        message = format!("Invalid path; path {:#?} does not exist", &full_path);
         error = true;
     };
     if full_path.is_dir() {
@@ -396,7 +542,7 @@ pub async fn get_file_contents_path(
     if error {
         return Err(TagentError::new(message, version.to_string()));
     }
-    //this line compiles but doesn't allow for a custom error
+    
     let fbody = NamedFile::open(full_path);
     let fbody = match fbody {
         Ok(f) => f,
@@ -435,6 +581,7 @@ pub async fn save_file(mut payload: Multipart, full_path: &str) -> std::io::Resu
     Ok(filepath)
 }
 
+// TODO -- remove?
 type FileUploadHttpRsp = Result<web::Json<FileUploadRsp>, TagentError>;
 
 #[post("/files/contents/{path:.*}")]
@@ -453,13 +600,13 @@ pub async fn post_file_contents_path(
     full_path.push(path);
     if !full_path.exists() {
         message = format!(
-            "Invalid path; path {:?} does not exist",
+            "Invalid path; path {:#?} does not exist",
             path_buf_to_str(&full_path)
         );
         error = true;
     };
     if !full_path.is_dir() {
-        message = format!("Invalid path; path {:?} must be a directory", full_path);
+        message = format!("Invalid path; path {:#?} must be a directory", full_path);
         error = true;
     };
     if error {
