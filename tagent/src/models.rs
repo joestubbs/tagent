@@ -54,19 +54,17 @@ impl DbAcl {
         if self.action == "Read" {
             // Read is less than every action
             return true;
-        }
-        else if self.action == "Execute" {
+        } else if self.action == "Execute" {
             if (action == "Execute") || (action == "Write") {
                 return true;
             }
-        }
-        else {
+        } else {
             // acl action is Write, so only Write is leq..
             if action == "Write" {
                 return true;
             }
         }
-        false        
+        false
     }
 }
 

@@ -1,6 +1,6 @@
 use actix_files::NamedFile;
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder, Result};
-use log::{debug, info, warn, error};
+use log::{debug, error, info, warn};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -14,8 +14,9 @@ use crate::models::AclAction;
 
 use super::auth::get_subject_of_request;
 use super::db::{
-    delete_acl_from_db_by_id, establish_connection, retrieve_acl_by_id, retrieve_all_acls,
-    save_acl, update_acl_in_db_by_id, retrieve_acls_for_subject, retrieve_acls_for_subject_user, is_authz_db
+    delete_acl_from_db_by_id, establish_connection, is_authz_db, retrieve_acl_by_id,
+    retrieve_acls_for_subject, retrieve_acls_for_subject_user, retrieve_all_acls, save_acl,
+    update_acl_in_db_by_id,
 };
 use super::models::NewAclJson;
 use super::representations::{
@@ -56,7 +57,7 @@ pub async fn create_acl(
             return Err(TagentError::new(msg, version.to_string()));
         }
     };
-    
+
     let mut conn = establish_connection();
     let r = save_acl(
         &mut conn,
@@ -263,8 +264,8 @@ pub async fn update_acl_by_id(
 pub async fn get_acls_for_subject(
     _req: HttpRequest,
     app_state: web::Data<AppState>,
-    path: web::Path<(String,)>)
-    -> Result<impl Responder, TagentError> {
+    path: web::Path<(String,)>,
+) -> Result<impl Responder, TagentError> {
     let version = &app_state.get_ref().app_version;
     let pub_key = &app_state.get_ref().pub_key;
 
@@ -281,11 +282,14 @@ pub async fn get_acls_for_subject(
         }
     };
     let mut conn = establish_connection();
-    let results = retrieve_acls_for_subject(&mut conn, &sub);
+    let results = retrieve_acls_for_subject(&mut conn, sub);
     let results = match results {
         Ok(r) => r,
         Err(e) => {
-            let msg = format!("Could not retrieve ACLs for subject {}; details: {}", sub, e);
+            let msg = format!(
+                "Could not retrieve ACLs for subject {}; details: {}",
+                sub, e
+            );
             debug!("{}", msg);
             return Err(TagentError::new(msg, version.to_string()));
         }
@@ -307,10 +311,11 @@ pub async fn get_acls_for_subject(
 }
 
 #[get("/acls/subject/{subject}/{user}")]
-pub async fn get_acls_for_subject_user(_req: HttpRequest,
+pub async fn get_acls_for_subject_user(
+    _req: HttpRequest,
     app_state: web::Data<AppState>,
-    path: web::Path<(String, String)>)
-    -> Result<impl Responder, TagentError> {
+    path: web::Path<(String, String)>,
+) -> Result<impl Responder, TagentError> {
     let version = &app_state.get_ref().app_version;
     let pub_key = &app_state.get_ref().pub_key;
 
@@ -328,11 +333,14 @@ pub async fn get_acls_for_subject_user(_req: HttpRequest,
         }
     };
     let mut conn = establish_connection();
-    let results = retrieve_acls_for_subject_user(&mut conn, &sub, &user);
+    let results = retrieve_acls_for_subject_user(&mut conn, sub, user);
     let results = match results {
         Ok(r) => r,
         Err(e) => {
-            let msg = format!("Could not retrieve ACLs for subject {}; details: {}", sub, e);
+            let msg = format!(
+                "Could not retrieve ACLs for subject {}; details: {}",
+                sub, e
+            );
             debug!("{}", msg);
             return Err(TagentError::new(msg, version.to_string()));
         }
@@ -357,51 +365,53 @@ pub async fn get_acls_for_subject_user(_req: HttpRequest,
 pub async fn is_authz_subject_user_action_path(
     _req: HttpRequest,
     app_state: web::Data<AppState>,
-    path: web::Path<(String, String, AclAction, PathBuf)>) 
-    -> Result<impl Responder, TagentError> {
+    path: web::Path<(String, String, AclAction, PathBuf)>,
+) -> Result<impl Responder, TagentError> {
+    let version = &app_state.get_ref().app_version;
+    let pub_key = &app_state.get_ref().pub_key;
 
-        let version = &app_state.get_ref().app_version;
-        let pub_key = &app_state.get_ref().pub_key;
-    
-        let sub = &path.0;
-        let usr = &path.1;
-        let act = &path.2;
-        let pth = &path.3;
+    let sub = &path.0;
+    let usr = &path.1;
+    let act = &path.2;
+    let pth = &path.3;
 
-        // all paths start with a slash
-        let mut check_path = String::from('/');
-        let pth_str = path_buf_to_string(pth.to_path_buf());
-        let pth_str = match pth_str {
-            Some(p) => p,
-            None => {
-                let msg = format!("Could not parse path variable in URL.");
-                error!("{}", msg);
-                return Err(TagentError::new(msg, version.to_string()));
-            }
-        };
-
-        if !(pth_str.starts_with('/')) {
-            check_path.push_str(&pth_str);
-        } else{
-            check_path = pth_str.to_string();
+    // all paths start with a slash
+    let mut check_path = String::from('/');
+    let pth_str = path_buf_to_string(pth.to_path_buf());
+    let pth_str = match pth_str {
+        Some(p) => p,
+        None => {
+            let msg = "Could not parse path variable in URL.".to_string();
+            error!("{}", msg);
+            return Err(TagentError::new(msg, version.to_string()));
         }
+    };
 
-        debug!("processing request to GET /acls/isauthz/{}/{}/{}/{:#?}", sub, usr, act, check_path);
-        
-        let subject = get_subject_of_request(_req, pub_key).await;
-        let _subject = match subject {
-            Ok(sub) => sub,
-            Err(error) => {
-                let msg = format!("got an error from get_subject_of_request; error: {}", error);
-                info!("{}", msg);
-                return Err(TagentError::new(msg, version.to_string()));
-            }
-        };
+    if !(pth_str.starts_with('/')) {
+        check_path.push_str(&pth_str);
+    } else {
+        check_path = pth_str.to_string();
+    }
 
-        let mut conn = establish_connection();
-        let result = is_authz_db(&mut conn, sub, usr, &check_path, act);
+    debug!(
+        "processing request to GET /acls/isauthz/{}/{}/{}/{:#?}",
+        sub, usr, act, check_path
+    );
 
-        let rsp = AclStringRsp {
+    let subject = get_subject_of_request(_req, pub_key).await;
+    let _subject = match subject {
+        Ok(sub) => sub,
+        Err(error) => {
+            let msg = format!("got an error from get_subject_of_request; error: {}", error);
+            info!("{}", msg);
+            return Err(TagentError::new(msg, version.to_string()));
+        }
+    };
+
+    let mut conn = establish_connection();
+    let result = is_authz_db(&mut conn, sub, usr, &check_path, act);
+
+    let rsp = AclStringRsp {
         status: String::from("success"),
         message: "Result of authz check returned".to_string(),
         result: result.to_string(),
@@ -409,7 +419,6 @@ pub async fn is_authz_subject_user_action_path(
     };
 
     Ok(web::Json(rsp))
-
 }
 
 // Utils
@@ -542,7 +551,7 @@ pub async fn get_file_contents_path(
     if error {
         return Err(TagentError::new(message, version.to_string()));
     }
-    
+
     let fbody = NamedFile::open(full_path);
     let fbody = match fbody {
         Ok(f) => f,

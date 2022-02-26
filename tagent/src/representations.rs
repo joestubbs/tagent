@@ -10,7 +10,6 @@ pub struct AppState {
     pub pub_key: RS256PublicKey,
 }
 
-
 // Ready Endpoint ----------
 
 #[derive(Serialize)]
@@ -65,8 +64,6 @@ impl ResponseError for TagentError {
         HttpResponse::BadRequest().body(body)
     }
 }
-
-
 
 // ACL Endpoints ----------
 
@@ -123,7 +120,6 @@ pub struct AclByIdRsp {
     pub result: Acl,
 }
 
-
 // Files Endpoints ----------
 
 #[derive(Serialize)]
@@ -141,4 +137,3 @@ pub struct FileUploadRsp {
     pub version: String,
     pub result: String,
 }
-
