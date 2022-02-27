@@ -1,11 +1,11 @@
 use actix_web::{HttpResponse, ResponseError};
 use jwt_simple::algorithms::RS256PublicKey;
 use serde::Serialize;
-use std::fmt;
+use std::{fmt, path::PathBuf};
 
 pub struct AppState {
     pub app_version: String,
-    pub root_dir: String,
+    pub root_dir: PathBuf,
     pub pub_key: RS256PublicKey,
 }
 
@@ -42,7 +42,7 @@ pub struct FileUploadRsp {
 }
 
 // The Error type that can convert to a actix_web::HttpResponse
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct TagentError {
     message: String,
     version: String,
@@ -51,6 +51,46 @@ pub struct TagentError {
 impl TagentError {
     pub fn new(message: String, version: String) -> Self {
         TagentError { message, version }
+    }
+
+    pub fn new_with_version(message: String) -> Self {
+        Self::new(message, String::from(env!("CARGO_PKG_VERSION")))
+    }
+}
+
+impl From<&str> for TagentError {
+    fn from(message: &str) -> Self {
+        TagentError::new_with_version(String::from(message))
+    }
+}
+
+impl From<String> for TagentError {
+    fn from(message: String) -> Self {
+        TagentError::new_with_version(message)
+    }
+}
+
+impl From<TagentError> for std::io::Error {
+    fn from(tagent_error: TagentError) -> Self {
+        std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!(
+                "TagentError (version: {}): {}",
+                tagent_error.message, tagent_error.version
+            ),
+        )
+    }
+}
+
+impl From<std::io::Error> for TagentError {
+    fn from(error: std::io::Error) -> Self {
+        TagentError::new_with_version(format!("IO Error: {}", error))
+    }
+}
+
+impl From<reqwest::Error> for TagentError {
+    fn from(error: reqwest::Error) -> Self {
+        TagentError::new_with_version(format!("Request Error: {}", error))
     }
 }
 
