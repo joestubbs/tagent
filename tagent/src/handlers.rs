@@ -1,6 +1,6 @@
 use actix_files::NamedFile;
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder, Result};
-use log::{debug, info};
+use log::debug;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -138,7 +138,7 @@ pub async fn delete_acl_by_id(
     let _subject = get_subject_of_request(_req, pub_key).await?;
     let mut conn = establish_connection();
     let _result = delete_acl_from_db_by_id(&mut conn, acl_id)?;
-    
+
     let rsp = AclStringRsp {
         status: String::from("success"),
         message: "ACL deleted successfully.".to_string(),
@@ -255,7 +255,7 @@ pub async fn is_authz_subject_user_action_path(
     // all paths start with a slash
     let mut check_path = String::from('/');
     if !(pth.starts_with('/')) {
-        check_path.push_str(&pth);
+        check_path.push_str(pth);
     } else {
         check_path = pth.to_string();
     }

@@ -1,8 +1,8 @@
 use crate::schema::*;
+use diesel::sql_types::Text;
 use diesel::Queryable;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use diesel::sql_types::Text;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum AclAction {
@@ -94,13 +94,9 @@ pub struct NewAclJson {
 }
 
 impl diesel::Expression for AclAction {
-    
     type SqlType = Text;
-    
 }
 
 impl diesel::Expression for AclDecision {
-    
     type SqlType = Text;
-    
 }
