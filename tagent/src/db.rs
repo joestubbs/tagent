@@ -3,7 +3,7 @@ use diesel::prelude::*;
 use crate::models::{AclAction, AclDecision, DbAcl};
 use chrono::prelude::{DateTime, Utc};
 use dotenv::dotenv;
-use log::{debug, error, info};
+use log::{debug, info};
 use regex::Regex;
 use std::env;
 use std::time::SystemTime;
@@ -214,7 +214,7 @@ pub fn is_authz_db(
     usr: &str,
     pth: &str,
     act: &AclAction,
-) -> bool {
+) -> Result<bool, diesel::result::Error> {
     use crate::schema::acls::decision;
     use crate::schema::acls::subject;
 
@@ -223,21 +223,10 @@ pub fn is_authz_db(
     let deny_acls = acls::dsl::acls
         .filter(subject.eq(&sub))
         .filter(decision.eq(&deny_str))
-        .load::<DbAcl>(conn);
-    let deny_acls = match deny_acls {
-        Ok(d) => d,
-        Err(e) => {
-            let msg = format!(
-                "got error retrieving Deny ACLS from db; Returning false! details: {}",
-                e
-            );
-            error!("{}", msg);
-            return false;
-        }
-    };
+        .load::<DbAcl>(conn)?;
     for acl in deny_acls {
         if check_acl_for_match(sub, usr, pth, &act.to_string(), &acl) {
-            return false;
+            return Ok(false);
         }
     }
     // check for any matching ACL with an Allow decision
@@ -245,24 +234,13 @@ pub fn is_authz_db(
     let allow_acls = acls::dsl::acls
         .filter(subject.eq(&sub))
         .filter(decision.eq(&allow_str))
-        .load::<DbAcl>(conn);
-    let allow_acls = match allow_acls {
-        Ok(d) => d,
-        Err(e) => {
-            let msg = format!(
-                "got error retrieving Allow ACLS from db; Returning false! details: {}",
-                e
-            );
-            error!("{}", msg);
-            return false;
-        }
-    };
+        .load::<DbAcl>(conn)?;
     for acl in allow_acls {
         if check_acl_for_match(sub, usr, pth, &act.to_string(), &acl) {
-            return true;
+            return Ok(true);
         }
     }
     debug!("no ACL matched; returning default decision (false)");
     // if no ACL matched then the action is not authorized by default
-    false
+    Ok(false)
 }

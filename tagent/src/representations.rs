@@ -60,6 +60,13 @@ impl From<String> for TagentError {
     }
 }
 
+impl From<diesel::result::Error> for TagentError {
+    fn from(e: diesel::result::Error) -> Self {
+        TagentError::new_with_version(format!("Error accessing database: {}", e.to_string()))
+
+    }
+}
+
 impl From<TagentError> for std::io::Error {
     fn from(tagent_error: TagentError) -> Self {
         std::io::Error::new(

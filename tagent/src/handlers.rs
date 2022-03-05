@@ -1,6 +1,6 @@
 use actix_files::NamedFile;
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder, Result};
-use log::{debug, error, info};
+use log::{debug, info};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -48,18 +48,9 @@ pub async fn create_acl(
     let version = &app_state.get_ref().app_version;
     let pub_key = &app_state.get_ref().pub_key;
     debug!("processing request to POST /acls");
-    let subject = get_subject_of_request(_req, pub_key).await;
-    let subject = match subject {
-        Ok(sub) => sub,
-        Err(error) => {
-            let msg = format!("got an error from get_subject_of_request; error: {}", error);
-            info!("{}", msg);
-            return Err(TagentError::new(msg, version.to_string()));
-        }
-    };
-
+    let subject = get_subject_of_request(_req, pub_key).await?;
     let mut conn = establish_connection();
-    let r = save_acl(
+    let _r = save_acl(
         &mut conn,
         &acl.subject,
         &acl.action,
@@ -67,16 +58,7 @@ pub async fn create_acl(
         &acl.user,
         &acl.decision,
         &subject,
-    );
-    let _r = match r {
-        Ok(r) => r,
-        Err(r) => {
-            return Err(TagentError::new(
-                format!("Could not save ACL to db; details {}", r),
-                version.to_string(),
-            ))
-        }
-    };
+    )?;
     let rsp = AclStringRsp {
         status: String::from("success"),
         message: format!("ACL for subject {} created successfully.", acl.subject),
@@ -95,27 +77,9 @@ pub async fn get_all_acls(
     let version = &app_state.get_ref().app_version;
     let pub_key = &app_state.get_ref().pub_key;
     debug!("processing request to GET /acls/all");
-    let subject = get_subject_of_request(_req, pub_key).await;
-    let _subject = match subject {
-        Ok(sub) => sub,
-        Err(error) => {
-            let msg = format!("got an error from get_subject_of_request; error: {}", error);
-            info!("{}", msg);
-            return Err(TagentError::new(msg, version.to_string()));
-        }
-    };
+    let _subject = get_subject_of_request(_req, pub_key).await?;
     let mut conn = establish_connection();
-    let acls_db = retrieve_all_acls(&mut conn);
-    let acls_db = match acls_db {
-        Ok(acls) => acls,
-        Err(e) => {
-            return Err(TagentError::new(
-                format!("Could not retrieve ACLs from db; details {}", e),
-                version.to_string(),
-            ))
-        }
-    };
-
+    let acls_db = retrieve_all_acls(&mut conn)?;
     let mut acls = Vec::<Acl>::new();
     for a in &acls_db {
         acls.push(Acl::from_db_acl(a));
@@ -143,25 +107,9 @@ pub async fn get_acl_by_id(
     let id = path.0;
 
     debug!("processing request to GET /acls/{}", id);
-    let subject = get_subject_of_request(_req, pub_key).await;
-    let _subject = match subject {
-        Ok(sub) => sub,
-        Err(error) => {
-            let msg = format!("got an error from get_subject_of_request; error: {}", error);
-            info!("{}", msg);
-            return Err(TagentError::new(msg, version.to_string()));
-        }
-    };
+    let _subject = get_subject_of_request(_req, pub_key).await?;
     let mut conn = establish_connection();
-    let result = retrieve_acl_by_id(&mut conn, id);
-    let result = match result {
-        Ok(r) => r,
-        Err(e) => {
-            let msg = format!("Could not retrieve ACL with id {}; details: {}", id, e);
-            debug!("{}", msg);
-            return Err(TagentError::new(msg, version.to_string()));
-        }
-    };
+    let result = retrieve_acl_by_id(&mut conn, id)?;
 
     let acl = Acl::from_db_acl(&result);
 
@@ -187,26 +135,10 @@ pub async fn delete_acl_by_id(
     let acl_id = path.0;
 
     debug!("processing request to DELETE /acls/{}", acl_id);
-    let subject = get_subject_of_request(_req, pub_key).await;
-    let _subject = match subject {
-        Ok(sub) => sub,
-        Err(error) => {
-            let msg = format!("got an error from get_subject_of_request; error: {}", error);
-            info!("{}", msg);
-            return Err(TagentError::new(msg, version.to_string()));
-        }
-    };
+    let _subject = get_subject_of_request(_req, pub_key).await?;
     let mut conn = establish_connection();
-    let result = delete_acl_from_db_by_id(&mut conn, acl_id);
-    match result {
-        Ok(_) => (),
-        Err(e) => {
-            let msg = format!("Could not delete ACL with id {}; details: {}", acl_id, e);
-            debug!("{}", msg);
-            return Err(TagentError::new(msg, version.to_string()));
-        }
-    };
-
+    let _result = delete_acl_from_db_by_id(&mut conn, acl_id)?;
+    
     let rsp = AclStringRsp {
         status: String::from("success"),
         message: "ACL deleted successfully.".to_string(),
@@ -230,25 +162,9 @@ pub async fn update_acl_by_id(
     let acl_id = path.0;
 
     debug!("processing request to PUT /acls/{}", acl_id);
-    let subject = get_subject_of_request(_req, pub_key).await;
-    let subject = match subject {
-        Ok(sub) => sub,
-        Err(error) => {
-            let msg = format!("got an error from get_subject_of_request; error: {}", error);
-            info!("{}", msg);
-            return Err(TagentError::new(msg, version.to_string()));
-        }
-    };
+    let subject = get_subject_of_request(_req, pub_key).await?;
     let mut conn = establish_connection();
-    let result = update_acl_in_db_by_id(&mut conn, acl_id, &acl, &subject);
-    match result {
-        Ok(_) => (),
-        Err(e) => {
-            let msg = format!("Could not update ACL with id {}; details: {}", acl_id, e);
-            debug!("{}", msg);
-            return Err(TagentError::new(msg, version.to_string()));
-        }
-    };
+    let _result = update_acl_in_db_by_id(&mut conn, acl_id, &acl, &subject)?;
 
     let rsp = AclStringRsp {
         status: String::from("success"),
@@ -272,29 +188,9 @@ pub async fn get_acls_for_subject(
     let sub = &path.0;
 
     debug!("processing request to GET /acls/subject/{}", sub);
-    let subject = get_subject_of_request(_req, pub_key).await;
-    let _subject = match subject {
-        Ok(sub) => sub,
-        Err(error) => {
-            let msg = format!("got an error from get_subject_of_request; error: {}", error);
-            info!("{}", msg);
-            return Err(TagentError::new(msg, version.to_string()));
-        }
-    };
+    let _subject = get_subject_of_request(_req, pub_key).await?;
     let mut conn = establish_connection();
-    let results = retrieve_acls_for_subject(&mut conn, sub);
-    let results = match results {
-        Ok(r) => r,
-        Err(e) => {
-            let msg = format!(
-                "Could not retrieve ACLs for subject {}; details: {}",
-                sub, e
-            );
-            debug!("{}", msg);
-            return Err(TagentError::new(msg, version.to_string()));
-        }
-    };
-
+    let results = retrieve_acls_for_subject(&mut conn, sub)?;
     let mut acls = Vec::<Acl>::new();
     for a in &results {
         acls.push(Acl::from_db_acl(a));
@@ -323,28 +219,9 @@ pub async fn get_acls_for_subject_user(
     let user = &path.1;
 
     debug!("processing request to GET /acls/subject/{}/{}", sub, user);
-    let subject = get_subject_of_request(_req, pub_key).await;
-    let _subject = match subject {
-        Ok(sub) => sub,
-        Err(error) => {
-            let msg = format!("got an error from get_subject_of_request; error: {}", error);
-            info!("{}", msg);
-            return Err(TagentError::new(msg, version.to_string()));
-        }
-    };
+    let _subject = get_subject_of_request(_req, pub_key).await?;
     let mut conn = establish_connection();
-    let results = retrieve_acls_for_subject_user(&mut conn, sub, user);
-    let results = match results {
-        Ok(r) => r,
-        Err(e) => {
-            let msg = format!(
-                "Could not retrieve ACLs for subject {}; details: {}",
-                sub, e
-            );
-            debug!("{}", msg);
-            return Err(TagentError::new(msg, version.to_string()));
-        }
-    };
+    let results = retrieve_acls_for_subject_user(&mut conn, sub, user)?;
 
     let mut acls = Vec::<Acl>::new();
     for a in &results {
@@ -365,7 +242,7 @@ pub async fn get_acls_for_subject_user(
 pub async fn is_authz_subject_user_action_path(
     _req: HttpRequest,
     app_state: web::Data<AppState>,
-    path: web::Path<(String, String, AclAction, PathBuf)>,
+    path: web::Path<(String, String, AclAction, String)>,
 ) -> Result<impl Responder, TagentError> {
     let version = &app_state.get_ref().app_version;
     let pub_key = &app_state.get_ref().pub_key;
@@ -377,20 +254,10 @@ pub async fn is_authz_subject_user_action_path(
 
     // all paths start with a slash
     let mut check_path = String::from('/');
-    let pth_str = path_buf_to_string(pth.to_path_buf());
-    let pth_str = match pth_str {
-        Some(p) => p,
-        None => {
-            let msg = "Could not parse path variable in URL.".to_string();
-            error!("{}", msg);
-            return Err(TagentError::new(msg, version.to_string()));
-        }
-    };
-
-    if !(pth_str.starts_with('/')) {
-        check_path.push_str(&pth_str);
+    if !(pth.starts_with('/')) {
+        check_path.push_str(&pth);
     } else {
-        check_path = pth_str.to_string();
+        check_path = pth.to_string();
     }
 
     debug!(
@@ -398,18 +265,9 @@ pub async fn is_authz_subject_user_action_path(
         sub, usr, act, check_path
     );
 
-    let subject = get_subject_of_request(_req, pub_key).await;
-    let _subject = match subject {
-        Ok(sub) => sub,
-        Err(error) => {
-            let msg = format!("got an error from get_subject_of_request; error: {}", error);
-            info!("{}", msg);
-            return Err(TagentError::new(msg, version.to_string()));
-        }
-    };
-
+    let _subject = get_subject_of_request(_req, pub_key).await?;
     let mut conn = establish_connection();
-    let result = is_authz_db(&mut conn, sub, usr, &check_path, act);
+    let result = is_authz_db(&mut conn, sub, usr, &check_path, act)?;
 
     let rsp = AclStringRsp {
         status: String::from("success"),
@@ -469,16 +327,8 @@ pub async fn list_files_path(
     // TODO -- specify PathBuf type in function signature?
     let path = params.0;
     debug!("processing request to GET /files/list/{}", path);
-    let subject = get_subject_of_request(_req, pub_key).await;
-    let subject = match subject {
-        Ok(sub) => sub,
-        Err(error) => {
-            let msg = format!("got an error from get_subject_of_request; error: {}", error);
-            info!("{}", msg);
-            return Err(TagentError::new(msg, version.to_string()));
-        }
-    };
-    info!("parsed jwt; subject: {}", subject);
+    let subject = get_subject_of_request(_req, pub_key).await?;
+    debug!("parsed jwt; subject: {}", subject);
 
     let mut full_path = PathBuf::from(root_dir);
     if path != "/" {
@@ -531,14 +381,7 @@ pub async fn get_file_contents_path(
         return Err(TagentError::new(message, version.to_string()));
     }
 
-    let fbody = NamedFile::open(full_path);
-    let fbody = match fbody {
-        Ok(f) => f,
-        Err(e) => {
-            let msg = format!("Got error trying to open file; details: {}", e);
-            return Err(TagentError::new(msg, version.to_string()));
-        }
-    };
+    let fbody = NamedFile::open(full_path)?;
     let res = fbody.into_response(&_req);
     Ok(res)
 }
@@ -601,15 +444,7 @@ pub async fn post_file_contents_path(
         return Err(TagentError::new(message, version.to_string()));
     };
     let full_path_s = path_buf_to_string(full_path).unwrap();
-    let upload_path = save_file(payload, &full_path_s).await;
-    let upload_path = match upload_path {
-        Err(e) => {
-            let message = format!("Unable to save file to disk; details: {}", e);
-            return Err(TagentError::new(message, version.to_string()));
-        }
-        Ok(p) => p,
-    };
-
+    let upload_path = save_file(payload, &full_path_s).await?;
     let r = FileUploadRsp {
         status: String::from("success"),
         message: format!("file uploaded to {} successfully.", upload_path),
