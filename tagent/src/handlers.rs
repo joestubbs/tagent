@@ -1,6 +1,6 @@
 use actix_files::NamedFile;
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder, Result};
-use log::{debug, error, info, warn};
+use log::{debug, error, info};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -434,27 +434,6 @@ pub fn path_buf_to_string(input: PathBuf) -> Option<String> {
     input.as_path().to_str().map(|s| s.to_string())
 }
 
-fn path_to_string(input: &Path) -> std::io::Result<String> {
-    input.to_str().map(String::from).ok_or_else(|| {
-        std::io::Error::new(std::io::ErrorKind::Other, "Couldn't convert path to string")
-    })
-}
-
-// TODO -- move to config.rs?
-pub(crate) fn get_root_dir() -> std::io::Result<String> {
-    std::env::var("TAGENT_HOME")
-        .or_else( |_| {warn!("TAGENT_HOME not set; using current working directory!"); std::env::current_dir()}
-            .and_then(std::fs::canonicalize)
-            .and_then(|x| path_to_string(&x)))
-        .or_else(|_| {warn!("Couldn't use the curent working directory; defaulting to $HOME!"); std::env::var("HOME")} )
-        .map_err(|_| {
-            std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Couldn't determine base directory.\nHelp: set the environment variable TAGENT_HOME.",
-            )
-        })
-}
-
 // files endpoints ---
 
 pub fn get_local_listing(full_path: PathBuf) -> Vec<String> {
@@ -651,74 +630,12 @@ mod test {
 
     use super::*;
 
-    #[test]
-    fn path_to_string_should_work_on_ascii() -> std::io::Result<()> {
-        let s = path_to_string(Path::new("/foo/bar"))?;
-        assert_eq!(s, "/foo/bar");
-        Ok(())
-    }
-
-    #[test]
-    fn path_to_string_should_work_on_unicode() -> std::io::Result<()> {
-        let s = path_to_string(Path::new("/\u{2122}foo/bar"))?;
-        assert_eq!(s, "/\u{2122}foo/bar");
-        Ok(())
-    }
-
-    #[test]
-    fn get_root_dir_with_tagent_home_var() -> std::io::Result<()> {
-        std::env::set_var("TAGENT_HOME", "bar");
-        let r = get_root_dir()?;
-        assert_eq!(r, "bar");
-        Ok(())
-    }
-
-    #[test]
-    fn get_root_dir_with_current_dir() -> std::io::Result<()> {
-        let temp = tempfile::TempDir::new()?;
-        std::env::set_current_dir(&temp)?;
-        std::env::remove_var("TAGENT_HOME");
-        let r = get_root_dir()?;
-        assert_eq!(r, std::fs::canonicalize(temp)?.to_str().unwrap());
-        Ok(())
-    }
-
-    #[test]
-    fn get_root_dir_with_user_home() -> std::io::Result<()> {
-        std::env::remove_var("TAGENT_HOME");
-        {
-            let temp = tempfile::TempDir::new()?;
-            std::env::set_current_dir(temp)?;
-            // temp gets deleted when going out of scope, so
-            // current_dir becomes invalid
-        }
-        std::env::set_var("HOME", "baz");
-        let a = get_root_dir()?;
-        assert_eq!(a, "baz");
-        Ok(())
-    }
-
-    #[test]
-    fn get_root_dir_should_fail_if_no_vars_or_current_dir() -> std::io::Result<()> {
-        std::env::remove_var("TAGENT_HOME");
-        {
-            let temp = tempfile::TempDir::new()?;
-            std::env::set_current_dir(temp)?;
-            // temp gets deleted when going out of scope, so
-            // current_dir becomes invalid
-        }
-        std::env::remove_var("HOME");
-        let a = get_root_dir();
-        assert!(a.is_err());
-        Ok(())
-    }
-
     #[actix_rt::test]
     async fn status_should_be_ready() -> std::io::Result<()> {
         let pub_str = String::from("-----BEGIN RSA PUBLIC KEY-----\nMIIBCgKCAQEAtsQsUV8QpqrygsY+2+JCQ6Fw8/omM71IM2N/R8pPbzbgOl0p78MZ\nGsgPOQ2HSznjD0FPzsH8oO2B5Uftws04LHb2HJAYlz25+lN5cqfHAfa3fgmC38Ff\nwBkn7l582UtPWZ/wcBOnyCgb3yLcvJrXyrt8QxHJgvWO23ITrUVYszImbXQ67YGS\n0YhMrbixRzmo2tpm3JcIBtnHrEUMsT0NfFdfsZhTT8YbxBvA8FdODgEwx7u/vf3J\n9qbi4+Kv8cvqyJuleIRSjVXPsIMnoejIn04APPKIjpMyQdnWlby7rNyQtE4+CV+j\ncFjqJbE/Xilcvqxt6DirjFCvYeKYl1uHLwIDAQAB\n-----END RSA PUBLIC KEY-----");
         let app_state = AppState {
             app_version: String::from("0.1.0"),
-            root_dir: String::from(""),
+            root_dir: PathBuf::from(""),
             pub_key: RS256PublicKey::from_pem(&pub_str).unwrap(),
         };
         let app = actix_web::test::init_service(
