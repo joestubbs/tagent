@@ -2,8 +2,9 @@ use crate::schema::*;
 use diesel::Queryable;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use diesel::sql_types::Text;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum AclAction {
     Read,
     Execute,
@@ -20,7 +21,7 @@ impl fmt::Display for AclAction {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum AclDecision {
     Allow,
     Deny,
@@ -68,7 +69,7 @@ impl DbAcl {
     }
 }
 
-// struct representing an ACL row to insert into sqlite the id attribute is not included
+// struct representing an ACL row to insert into sqlite; the id attribute is not included
 #[derive(Debug, Insertable)]
 #[table_name = "acls"]
 pub struct NewAcl<'a> {
@@ -82,11 +83,24 @@ pub struct NewAcl<'a> {
 }
 
 // struct representing a user-supplied JSON object describing a new ACL to be created
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Insertable)]
+#[table_name = "acls"]
 pub struct NewAclJson {
     pub subject: String,
     pub action: AclAction,
     pub decision: AclDecision,
     pub path: String,
     pub user: String,
+}
+
+impl diesel::Expression for AclAction {
+    
+    type SqlType = Text;
+    
+}
+
+impl diesel::Expression for AclDecision {
+    
+    type SqlType = Text;
+    
 }
