@@ -3,13 +3,13 @@ use diesel::prelude::*;
 use crate::models::{AclAction, AclDecision, DbAcl};
 use chrono::prelude::{DateTime, Utc};
 use dotenv::dotenv;
-use log::{debug, info};
-use regex::Regex;
+use log::{debug};
 use std::env;
 use std::time::SystemTime;
 
 use super::models::{NewAcl, NewAclJson};
 use super::schema::acls;
+use super::representations::AuthCheckError;
 
 pub fn establish_connection() -> SqliteConnection {
     dotenv().ok();
@@ -128,56 +128,41 @@ pub fn update_acl_in_db_by_id(
         .execute(conn)
 }
 
-// checks whether a field with a wildcard character matches another field value
-pub fn check_acl_field_with_wildcard_for_match(acl_field: &str, field: &str) -> bool {
-    let re = Regex::new(acl_field);
-    let re = match re {
-        Ok(re) => re,
-        Err(e) => {
-            let msg = format!("acl was not a valid regex; details: {}", e);
-            info!("{}", msg);
-            return false;
-        }
+/// Checks whether a field with a wildcard character matches another field value
+pub fn check_acl_glob_for_match(acl_field: &str, field: &str) -> Result<bool, glob::PatternError> {
+    let options = glob::MatchOptions { 
+        case_sensitive: false,
+        // Require the path separator (/) to be  matched explicitly by a literal / in the pattern.
+        require_literal_separator: true,
+        require_literal_leading_dot: false,
     };
-    re.is_match(field)
+    let gb = glob::Pattern::new(&acl_field)?;
+    Ok(gb.matches_with(field, options))
 }
 
 // checks if a DB ACL matches a set of criteria
-pub fn check_acl_for_match(sub: &str, usr: &str, pth: &str, act: &str, acl: &DbAcl) -> bool {
+pub fn check_acl_for_match(sub: &str, usr: &str, pth: &str, act: &str, acl: &DbAcl) -> Result<bool, glob::PatternError> {
     debug!("top of check_acl_for_match for acl: {}", acl.id);
     // subject must be an exact match
     if sub != acl.subject {
         debug!("subject didn't match; returning false");
-        return false;
+        return Ok(false);
     };
     // user field allowed to have wild cards
     if usr != acl.user {
         debug!("user isn't exact match");
-        // if it wasn't an exact match and the acl doesn't contain wildcards, it's not a match
-        if !acl.user.contains('*') {
-            debug!("acl user was not a regex; returning false");
-            return false;
-        };
-        debug!("acl user WAS a regex; checking for wildcard match");
-        // special check for acl with wildcard
-        if !(check_acl_field_with_wildcard_for_match(&acl.user, usr)) {
-            debug!("acl user regex didn't match; returning false");
-            return false;
+        if !(check_acl_glob_for_match(&acl.user, usr)?) {
+            debug!("acl user glob didn't match; returning false");
+            return Ok(false);
         };
     };
     // path field allowed to have wild cards
     if pth != acl.path {
-        debug!("patch isn't exact match");
-        // if it wasn't an exact match and the acl doesn't contain wildcards, it's not a match
-        if !acl.path.contains('*') {
-            debug!("acl path was not a regex; returning false");
-            return false;
-        };
-        debug!("acl path WAS a regex; checking for wildcard match");
+        debug!("path isn't exact match");
         // special check for acl with wildcard
-        if !(check_acl_field_with_wildcard_for_match(&acl.path, pth)) {
-            debug!("acl path regex didn't match; returning false");
-            return false;
+        if !(check_acl_glob_for_match(&acl.path, pth)?) {
+            debug!("acl path glob didn't match; returning false");
+            return Ok(false);
         };
     };
 
@@ -189,7 +174,7 @@ pub fn check_acl_for_match(sub: &str, usr: &str, pth: &str, act: &str, acl: &DbA
         // in case Allow, higher ACL values match because an Allow of a higher action implies allow for lower actions
         if acl.decision == "Allow" {
             if acl.is_leq_action(act) {
-                return false;
+                return Ok(false);
             }
         }
         // acl decision is "Deny" so it is only a match if the acl action is greater than
@@ -200,12 +185,12 @@ pub fn check_acl_for_match(sub: &str, usr: &str, pth: &str, act: &str, acl: &DbA
             );
             if !(acl.is_leq_action(act)) {
                 debug!("Deny ACL action was not less than action.. returning false");
-                return false;
+                return Ok(false);
             }
         }
     };
     debug!("db_acl with id {} matched request", acl.id);
-    true
+    Ok(true)
 }
 
 pub fn is_authz_db(
@@ -214,7 +199,7 @@ pub fn is_authz_db(
     usr: &str,
     pth: &str,
     act: &AclAction,
-) -> Result<bool, diesel::result::Error> {
+) -> Result<bool, AuthCheckError> {
     use crate::schema::acls::decision;
     use crate::schema::acls::subject;
 
@@ -225,7 +210,7 @@ pub fn is_authz_db(
         .filter(decision.eq(&deny_str))
         .load::<DbAcl>(conn)?;
     for acl in deny_acls {
-        if check_acl_for_match(sub, usr, pth, &act.to_string(), &acl) {
+        if check_acl_for_match(sub, usr, pth, &act.to_string(), &acl)? {
             return Ok(false);
         }
     }
@@ -236,7 +221,7 @@ pub fn is_authz_db(
         .filter(decision.eq(&allow_str))
         .load::<DbAcl>(conn)?;
     for acl in allow_acls {
-        if check_acl_for_match(sub, usr, pth, &act.to_string(), &acl) {
+        if check_acl_for_match(sub, usr, pth, &act.to_string(), &acl)? {
             return Ok(true);
         }
     }

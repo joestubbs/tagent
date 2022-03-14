@@ -1,7 +1,9 @@
 use crate::schema::*;
 use diesel::sql_types::Text;
 use diesel::Queryable;
+use glob;
 use serde::{Deserialize, Serialize};
+// use std::fmt::{self, Result};
 use std::fmt;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -91,6 +93,15 @@ pub struct NewAclJson {
     pub decision: AclDecision,
     pub path: String,
     pub user: String,
+}
+
+impl NewAclJson {
+    pub fn validate_path(&self) -> Result<(), glob::PatternError> {
+        // ensure that the path can be converted to a glob
+        let _g = glob::Pattern::new(&self.path)?;
+        Ok(())
+    }
+    
 }
 
 impl diesel::Expression for AclAction {
