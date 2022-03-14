@@ -24,6 +24,14 @@ use super::representations::{
     TagentError,
 };
 
+
+// default service -- called when no handler matches the request
+pub async fn not_found() -> Result<HttpResponse, TagentError> {
+
+    Err(TagentError::new_with_version("The API endpoint does not exist; check the URL path and HTTP verb.".to_string()))
+}
+
+
 // status endpoints ---
 #[get("/status/ready")]
 pub async fn ready(app_state: web::Data<AppState>) -> Result<impl Responder, TagentError> {
@@ -50,6 +58,7 @@ pub async fn create_acl(
     debug!("processing request to POST /acls");
     let subject = get_subject_of_request(_req, pub_key).await?;
     let mut conn = establish_connection();
+    let _r = acl.validate_path()?;
     let _r = save_acl(
         &mut conn,
         &acl.subject,
@@ -467,7 +476,8 @@ mod test {
 
     #[actix_rt::test]
     async fn status_should_be_ready() -> std::io::Result<()> {
-        let pub_str = String::from("-----BEGIN RSA PUBLIC KEY-----\nMIIBCgKCAQEAtsQsUV8QpqrygsY+2+JCQ6Fw8/omM71IM2N/R8pPbzbgOl0p78MZ\nGsgPOQ2HSznjD0FPzsH8oO2B5Uftws04LHb2HJAYlz25+lN5cqfHAfa3fgmC38Ff\nwBkn7l582UtPWZ/wcBOnyCgb3yLcvJrXyrt8QxHJgvWO23ITrUVYszImbXQ67YGS\n0YhMrbixRzmo2tpm3JcIBtnHrEUMsT0NfFdfsZhTT8YbxBvA8FdODgEwx7u/vf3J\n9qbi4+Kv8cvqyJuleIRSjVXPsIMnoejIn04APPKIjpMyQdnWlby7rNyQtE4+CV+j\ncFjqJbE/Xilcvqxt6DirjFCvYeKYl1uHLwIDAQAB\n-----END RSA PUBLIC KEY-----");
+        let pub_str = include_str!("../public.example");
+        let jwt_str = include_str!("../jwt.example");
         let app_state = AppState {
             app_version: String::from("0.1.0"),
             root_dir: PathBuf::from(""),
@@ -479,9 +489,34 @@ mod test {
         .await;
         let req = actix_web::test::TestRequest::get()
             .uri("/status/ready")
+            .insert_header((String::from("x-tapis-token"), jwt_str))
             .to_request();
         let resp = actix_web::test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
         Ok(())
+    }
+
+    #[actix_rt::test]
+    async fn files_list_dir() -> std::io::Result<()> {
+        let pub_str = include_str!("../public.example");
+        let jwt_str = include_str!("../jwt.example");
+        let app_state = AppState {
+            app_version: String::from("0.1.0"),
+            root_dir: PathBuf::from("/"),
+            pub_key: RS256PublicKey::from_pem(&pub_str).unwrap(),
+        };
+        let app = actix_web::test::init_service(
+            App::new().configure(make_config(web::Data::new(app_state))),
+        )
+        .await;
+        let req = actix_web::test::TestRequest::get()
+            .uri("/files/list/")
+            .insert_header((String::from("x-tapis-token"), jwt_str))
+            .to_request();
+        let resp = actix_web::test::call_service(&app, req).await;
+        // dbg!(&resp.into_body());
+        assert_eq!(resp.status(), StatusCode::OK);
+        Ok(())
+
     }
 }
