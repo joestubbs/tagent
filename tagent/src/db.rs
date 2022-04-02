@@ -3,13 +3,13 @@ use diesel::prelude::*;
 use crate::models::{AclAction, AclDecision, DbAcl};
 use chrono::prelude::{DateTime, Utc};
 use dotenv::dotenv;
-use log::{debug};
+use log::debug;
 use std::env;
 use std::time::SystemTime;
 
 use super::models::{NewAcl, NewAclJson};
-use super::schema::acls;
 use super::representations::AuthCheckError;
+use super::schema::acls;
 
 pub fn establish_connection() -> SqliteConnection {
     dotenv().ok();
@@ -130,18 +130,24 @@ pub fn update_acl_in_db_by_id(
 
 /// Checks whether a field with a wildcard character matches another field value
 pub fn check_acl_glob_for_match(acl_field: &str, field: &str) -> Result<bool, glob::PatternError> {
-    let options = glob::MatchOptions { 
+    let options = glob::MatchOptions {
         case_sensitive: false,
         // Require the path separator (/) to be  matched explicitly by a literal / in the pattern.
         require_literal_separator: true,
         require_literal_leading_dot: false,
     };
-    let gb = glob::Pattern::new(&acl_field)?;
+    let gb = glob::Pattern::new(acl_field)?;
     Ok(gb.matches_with(field, options))
 }
 
 // checks if a DB ACL matches a set of criteria
-pub fn check_acl_for_match(sub: &str, usr: &str, pth: &str, act: &str, acl: &DbAcl) -> Result<bool, glob::PatternError> {
+pub fn check_acl_for_match(
+    sub: &str,
+    usr: &str,
+    pth: &str,
+    act: &str,
+    acl: &DbAcl,
+) -> Result<bool, glob::PatternError> {
     debug!("top of check_acl_for_match for acl: {}", acl.id);
     // subject must be an exact match
     if sub != acl.subject {
