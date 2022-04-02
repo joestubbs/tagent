@@ -24,13 +24,12 @@ use super::representations::{
     TagentError,
 };
 
-
 // default service -- called when no handler matches the request
 pub async fn not_found() -> Result<HttpResponse, TagentError> {
-
-    Err(TagentError::new_with_version("The API endpoint does not exist; check the URL path and HTTP verb.".to_string()))
+    Err(TagentError::new_with_version(
+        "The API endpoint does not exist; check the URL path and HTTP verb.".to_string(),
+    ))
 }
-
 
 // status endpoints ---
 #[get("/status/ready")]
@@ -481,7 +480,7 @@ mod test {
         let app_state = AppState {
             app_version: String::from("0.1.0"),
             root_dir: PathBuf::from(""),
-            pub_key: RS256PublicKey::from_pem(&pub_str).unwrap(),
+            pub_key: RS256PublicKey::from_pem(pub_str).unwrap(),
         };
         let app = actix_web::test::init_service(
             App::new().configure(make_config(web::Data::new(app_state))),
@@ -503,7 +502,7 @@ mod test {
         let app_state = AppState {
             app_version: String::from("0.1.0"),
             root_dir: PathBuf::from("/"),
-            pub_key: RS256PublicKey::from_pem(&pub_str).unwrap(),
+            pub_key: RS256PublicKey::from_pem(pub_str).unwrap(),
         };
         let app = actix_web::test::init_service(
             App::new().configure(make_config(web::Data::new(app_state))),
@@ -517,6 +516,5 @@ mod test {
         // dbg!(&resp.into_body());
         assert_eq!(resp.status(), StatusCode::OK);
         Ok(())
-
     }
 }
