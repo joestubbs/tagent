@@ -1,9 +1,8 @@
 use crate::schema::*;
 use diesel::sql_types::Text;
 use diesel::Queryable;
-use glob;
+// use glob;
 use serde::{Deserialize, Serialize};
-// use std::fmt::{self, Result};
 use std::fmt;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -101,7 +100,6 @@ impl NewAclJson {
         let _g = glob::Pattern::new(&self.path)?;
         Ok(())
     }
-    
 }
 
 impl diesel::Expression for AclAction {

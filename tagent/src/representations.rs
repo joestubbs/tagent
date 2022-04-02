@@ -1,9 +1,9 @@
 use super::models::DbAcl;
 use actix_web::{HttpResponse, ResponseError};
+// use glob;
 use jwt_simple::algorithms::RS256PublicKey;
 use serde::Serialize;
 use std::{fmt, path::PathBuf};
-use glob;
 
 pub struct AppState {
     pub app_version: String,
@@ -47,7 +47,6 @@ impl From<glob::PatternError> for AuthCheckError {
         AuthCheckError::Glb(error)
     }
 }
-
 
 // The basic representation of an HTTP Error response
 #[derive(Serialize)]
@@ -129,7 +128,10 @@ impl From<reqwest::Error> for TagentError {
 
 impl From<AuthCheckError> for TagentError {
     fn from(error: AuthCheckError) -> Self {
-        TagentError::new_with_version(format!("Unable to calculate auth check; details: {}", error))
+        TagentError::new_with_version(format!(
+            "Unable to calculate auth check; details: {}",
+            error
+        ))
     }
 }
 
@@ -153,7 +155,6 @@ impl ResponseError for TagentError {
         HttpResponse::BadRequest().body(body)
     }
 }
-
 
 // ACL Endpoints ----------
 
@@ -180,7 +181,7 @@ pub struct Acl {
 }
 
 impl Acl {
-    /// Convert a database representation of an ACL (Dbacl) to an Acl formatted for a response. 
+    /// Convert a database representation of an ACL (Dbacl) to an Acl formatted for a response.
     pub fn from_db_acl(db_acl: &DbAcl) -> Self {
         Acl {
             id: db_acl.id,
