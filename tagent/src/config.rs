@@ -61,25 +61,58 @@ async fn fetch_publickey(uri: &str) -> Result<String, TagentError> {
 //      64 or fewer printable characters."
 // This function adds the necessary line breaks
 fn insert_line_breaks_pub_key(mut pub_key: String) -> std::io::Result<String> {
-    
-    // first, filter out all newline characters from the pub_key string 
+    // first, filter out all newline characters from the pub_key string
     pub_key.retain(|c| c != '\n');
     // regex that pulls out the BEGIN and END blocks into their own groups
     let re = regex::Regex::new(r"(-----.*?-----)(.*)(-----.*?-----)").unwrap();
-    let grps = re.captures(&pub_key).ok_or(std::io::Error::new(std::io::ErrorKind::Other, "Invalid public key"))?;
+    let grps = re
+        .captures(&pub_key)
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "Invalid public key"))?;
     if !grps.len() == 4 {
-        return Err(std::io::Error::new(std::io::ErrorKind::Other, "Invalid public key format; did not find the expected number of parts of public key."));
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Invalid public key format; did not find the expected number of parts of public key.",
+        ));
     }
-    // the 0th group is the full string; 
+    // the 0th group is the full string;
     // the first group is the first group matched (i.e., the -----BEGIN ... KEY----- block)
     // the 2nd group is the base64-encoded portion of the public key.
     // the 3rd group is the last matched group (i.e., the -----END ... KEY----- block)
 
-    let begin_grp = grps.get(1).ok_or(std::io::Error::new(std::io::ErrorKind::Other, "Invalid public key; error getting base64-encoded portion of key."))?.as_str();
-    let result = grps.get(2).ok_or(std::io::Error::new(std::io::ErrorKind::Other, "Invalid public key; error getting base64-encoded portion of key."))?.as_str();
-    let end_grp = grps.get(3).ok_or(std::io::Error::new(std::io::ErrorKind::Other, "Invalid public key; error getting base64-encoded portion of key."))?.as_str();
+    let begin_grp = grps
+        .get(1)
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Invalid public key; error getting base64-encoded portion of key.",
+            )
+        })?
+        .as_str();
+    let result = grps
+        .get(2)
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Invalid public key; error getting base64-encoded portion of key.",
+            )
+        })?
+        .as_str();
+    let end_grp = grps
+        .get(3)
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Invalid public key; error getting base64-encoded portion of key.",
+            )
+        })?
+        .as_str();
     // convert result to a vector of strings of length 64, with the last one being less than or equal to 64.
-    let mut result = result.chars().collect::<Vec<char>>().chunks(64).map(|c| c.iter().collect::<String>()).collect::<Vec<String>>();
+    let mut result = result
+        .chars()
+        .collect::<Vec<char>>()
+        .chunks(64)
+        .map(|c| c.iter().collect::<String>())
+        .collect::<Vec<String>>();
     result.insert(0, begin_grp.to_string());
     result.push(end_grp.to_string());
     Ok(result.join("\n"))
