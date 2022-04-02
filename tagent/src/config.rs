@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use config::Config;
 use jwt_simple::algorithms::RS256PublicKey;
-use log::{debug, error, info};
+use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 
