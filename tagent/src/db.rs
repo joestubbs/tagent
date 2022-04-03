@@ -132,8 +132,14 @@ pub fn update_acl_in_db_by_id(
 pub fn check_acl_glob_for_match(acl_field: &str, field: &str) -> Result<bool, glob::PatternError> {
     let options = glob::MatchOptions {
         case_sensitive: false,
-        // Require the path separator (/) to be  matched explicitly by a literal / in the pattern.
-        require_literal_separator: true,
+        // Whether or not to require that the path separator (/) be  matched explicitly by a literal / in the 
+        // user-supplied pattern. Note that the consequence of this configuration is whether or not a pattern 
+        // with a star, such as /foo/bar/*, matches on all subdirectories. 
+        // That is, /foo/bar/* will always match /foo/bar/<any_file>, but with require_literal_separator set to false,
+        // it will also match /foo/bar/baz/bop/<any_file>, etc.
+        require_literal_separator: false,
+        // set to true to prevent matching on subdirectories.
+        // require_literal_separator: true,
         require_literal_leading_dot: false,
     };
     let gb = glob::Pattern::new(acl_field)?;

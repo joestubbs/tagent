@@ -517,4 +517,27 @@ mod test {
         assert_eq!(resp.status(), StatusCode::OK);
         Ok(())
     }
+
+    #[actix_rt::test]
+    async fn acls_list_all() -> std::io::Result<()> {
+        let pub_str = include_str!("../public.example");
+        let jwt_str = include_str!("../jwt.example");
+        let app_state = AppState {
+            app_version: String::from("0.1.0"),
+            root_dir: PathBuf::from("/"),
+            pub_key: RS256PublicKey::from_pem(pub_str).unwrap(),
+        };
+        let app = actix_web::test::init_service(
+            App::new().configure(make_config(web::Data::new(app_state))),
+        )
+        .await;
+        let req = actix_web::test::TestRequest::get()
+            .uri("/acls")
+            .insert_header((String::from("x-tapis-token"), jwt_str))
+            .to_request();
+        let resp: AclListingRsp = actix_web::test::call_and_read_body_json(&app, req).await;
+        // dbg!(&resp.into_body());
+        // assert_eq!(resp.status(), StatusCode::OK);
+        Ok(())
+    }
 }

@@ -6,7 +6,7 @@
 `tagent` provides HTTP APIs for basic file management tasks. The server includes endpoints for listing file paths,
 uploading and downloading files.
 
-An OpenAPI v3 specification is included.
+An OpenAPI v3 specification is inc+tagent/tagent.dbluded.
 
 ## Building the Project
 The project requires a recent version of Rust (e.g., 1.57.0); install using `rustup`. 
@@ -61,7 +61,23 @@ $ cargo run
 
 ## Examples
 
-The following examples use `curl` to illustrate the functionality.
+The following examples use `curl` to illustrate the functionality. 
+
+### Authentication
+
+Currently, `tagent` uses JWT authentication, and it expects a signed JWT with a `sub` claim in the `X-Tapis-Tenant`
+header. In a future release, the authentication mechanism will be optional and configurable. This repository includes
+an example RSA public/private key pair and an example JWT which can be used directly.
+
+Alternatively, generate a new RSA keypar with openssl
+
+```
+$ private_key=`openssl genrsa 1024`
+$ echo $private_key > private.key
+$ echo "$private_key" | sed -e 's/^[ ]*//' | openssl rsa -pubout  > public.key
+```
+
+and/or generate your own JWTs with jwt.io or a site such as https://dinochiesa.github.io/jwt/
 
 
 ### Working with Files
@@ -146,8 +162,9 @@ to perform certain requests. There are 5 aspects to an ACL:
   * ``subject`` -- The subject of the ACL. This must be an exact match to the subject making the request for the ACL to apply.
   * ``action`` -- The action being taken. This can be one of ``Read``, ``Execute`` or ``Write``. The actions are ordered:
      ``Read`` is less than ``Execute`` and ``Execute`` is less than ``Write``. 
-  * ``path`` -- The URL path associated with the ACL. This can be a string literal or it can contain a regular expression.
-  * ``user`` -- The user that the subject is acting on behalf of, or ``self`` when the subject is acting as itself.
+  * ``path`` -- The URL path associated with the ACL. This can be a string literal or it can contain a Unix glob expression.
+  * ``user`` -- The user that the subject is acting on behalf of, or ``self`` when the subject is acting as itself. The
+  user field can also contain a glob pattern. 
   * ``decision`` -- Whether the ACL authorizes (``Allow``) or does not authorize (``Deny``) the subject for the request.
 
 When checking ACLs, ``tagent`` uses the following algorithm:
@@ -177,10 +194,10 @@ $ curl -H "content-type: application/json" -d '{"subject": "tenants@admin", "act
 }
 ```
 
-2. Create an ``Allow`` ACL with a wild card that matches any files in the root directory with an extension of ``.txt``. Note that 
-we use a regular expression syntax here, where the ``.*`` matches any characters.
+2. Create an ``Allow`` ACL with a wild card that matches any files in the root directory with an extension of ``.txt``. Note that we use a glob expression syntax here, where the ``.*`` matches any characters.
+
 ```
-$ curl -H "content-type: application/json" -d '{"subject": "tenants@admin", "action": "Write", "user": "self", "path": "/.*.txt", "decision": "Allow"}'  -H "x-tapis-token: $jwt" localhost:8080/acls|jq
+$ curl -H "content-type: application/json" -d '{"subject": "tenants@admin", "action": "Write", "user": "self", "path": "/*.txt", "decision": "Allow"}'  -H "x-tapis-token: $jwt" localhost:8080/acls|jq
 
 {
   "message": "ACL for tenants@admin created successfully.",
@@ -276,7 +293,7 @@ We can ask ``tagent`` if a specific request will be authorized by providing a su
 the following request:
 
 ```
-$ curl -H "x-tapis-token: $jwt" localhost:8080/acls/iauthz/tenants@admin/self/Read/tmp/testup.txt
+$ curl -H "x-tapis-token: $jwt" localhost:8080/acls/isauthz/tenants@admin/self/Read/tmp/testup.txt
 
 {
   "message": "Result of authz check returned",
@@ -288,8 +305,7 @@ $ curl -H "x-tapis-token: $jwt" localhost:8080/acls/iauthz/tenants@admin/self/Re
 ```
 
 
-7. We also authorized ``tenants@admin`` for any path ending in a ``.txt`` extension in the root at the ``Write`` level, so the 
-following also all return ``true`` responses: 
+7. We also authorized ``tenants@admin`` for any path ending in a ``.txt`` extension in the root at the ``Write`` level, so the following also all return ``true`` responses: 
 
 ```
 $ curl -H "x-tapis-token: $jwt" localhost:8080/acls/isauthz/tenants@admin/self/Write/testup.txt
@@ -326,11 +342,11 @@ $ curl -H "x-tapis-token: $jwt" localhost:8080/acls/isauthz/tenants@admin/self/E
 }
 ```
 
-8. However, we explicitly created a ``Deny`` ACL for all paths starting with ``exam`` in the root (at a ``Read`` level), so
+8. However, we explicitly created a ``Deny`` ACL for all paths starting with ``exam.`` in the root (at a ``Read`` level), so
 the following return ``false``:
 
 ```
-$ curl -H "x-tapis-token: $jwt" localhost:8080/acls/isauthz/tenants@admin/self/Execute/exam123.txt
+$ curl -H "x-tapis-token: $jwt" localhost:8080/acls/isauthz/tenants@admin/self/Execute/exam.txt
 
 {
   "message": "Result of authz check returned",
