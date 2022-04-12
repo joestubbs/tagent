@@ -4,7 +4,7 @@ use super::models::DbAcl;
 use actix_web::{HttpResponse, ResponseError};
 // use glob;
 use jwt_simple::algorithms::RS256PublicKey;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::{fmt, path::PathBuf};
 
 pub struct AppState {
@@ -141,7 +141,10 @@ impl From<AuthCheckError> for TagentError {
 use r2d2::Error;
 impl From<Error> for TagentError {
     fn from(error: Error) -> Self {
-        TagentError::new_with_version(format!("Unable to get database connection; details: {}", error))
+        TagentError::new_with_version(format!(
+            "Unable to get database connection; details: {}",
+            error
+        ))
     }
 }
 

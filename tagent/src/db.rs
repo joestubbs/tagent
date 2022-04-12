@@ -15,13 +15,12 @@ use super::schema::acls;
 use diesel::r2d2::ConnectionManager;
 use r2d2::{Pool, PooledConnection};
 
-
 pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
 
 /// Create a sqlite connection pool; the db_name attribute is only used in testing; should be an absolute path
 /// to a file to use for the connection pool. This allows for the creation of different connection pools for each test
 /// or set of tests.
-pub fn get_db_pool(db_name: Option<String>) -> DbPool{ 
+pub fn get_db_pool(db_name: Option<String>) -> DbPool {
     if cfg!(test) {
         let db_path = &db_name.expect("db_name must be provided");
         dbg!(&db_path);
@@ -30,17 +29,19 @@ pub fn get_db_pool(db_name: Option<String>) -> DbPool{
         // let mem_db = ":memory:";
         dbg!(&mem_db);
         let manager = ConnectionManager::<SqliteConnection>::new(mem_db);
-        let pool = r2d2::Pool::builder().build(manager).expect("Failed to create DB pool.");
+        let pool = r2d2::Pool::builder()
+            .build(manager)
+            .expect("Failed to create DB pool.");
         let _result = diesel_migrations::run_pending_migrations(&pool.get().unwrap());
         pool
     } else {
         let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
         let manager = ConnectionManager::<SqliteConnection>::new(&database_url);
-        r2d2::Pool::builder().build(manager).expect("Failed to create DB pool.")
+        r2d2::Pool::builder()
+            .build(manager)
+            .expect("Failed to create DB pool.")
     }
-
 }
-
 
 // convert current system time to iso8601
 // cf., https://stackoverflow.com/questions/64146345/how-do-i-convert-a-systemtime-to-iso-8601-in-rust
@@ -84,7 +85,9 @@ pub fn save_acl(
         .execute(conn)
 }
 
-pub fn retrieve_all_acls(conn: &PooledConnection<ConnectionManager<diesel::SqliteConnection>>,) -> Result<Vec<DbAcl>, diesel::result::Error> {
+pub fn retrieve_all_acls(
+    conn: &PooledConnection<ConnectionManager<diesel::SqliteConnection>>,
+) -> Result<Vec<DbAcl>, diesel::result::Error> {
     acls::dsl::acls.load::<DbAcl>(conn)
 }
 
@@ -154,9 +157,9 @@ pub fn update_acl_in_db_by_id(
 pub fn check_acl_glob_for_match(acl_field: &str, field: &str) -> Result<bool, glob::PatternError> {
     let options = glob::MatchOptions {
         case_sensitive: false,
-        // Whether or not to require that the path separator (/) be  matched explicitly by a literal / in the 
-        // user-supplied pattern. Note that the consequence of this configuration is whether or not a pattern 
-        // with a star, such as /foo/bar/*, matches on all subdirectories. 
+        // Whether or not to require that the path separator (/) be  matched explicitly by a literal / in the
+        // user-supplied pattern. Note that the consequence of this configuration is whether or not a pattern
+        // with a star, such as /foo/bar/*, matches on all subdirectories.
         // That is, /foo/bar/* will always match /foo/bar/<any_file>, but with require_literal_separator set to false,
         // it will also match /foo/bar/baz/bop/<any_file>, etc.
         require_literal_separator: false,

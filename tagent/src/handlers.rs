@@ -14,9 +14,8 @@ use crate::models::AclAction;
 
 use super::auth::get_subject_of_request;
 use super::db::{
-    delete_acl_from_db_by_id, is_authz_db, retrieve_acl_by_id,
-    retrieve_acls_for_subject, retrieve_acls_for_subject_user, retrieve_all_acls, save_acl,
-    update_acl_in_db_by_id,
+    delete_acl_from_db_by_id, is_authz_db, retrieve_acl_by_id, retrieve_acls_for_subject,
+    retrieve_acls_for_subject_user, retrieve_all_acls, save_acl, update_acl_in_db_by_id,
 };
 use super::models::NewAclJson;
 use super::representations::{
@@ -466,41 +465,39 @@ pub async fn post_file_contents_path(
 
 #[cfg(test)]
 mod test {
-    use std::{collections::HashSet, ffi::OsStr};
-    use std::io::Write;
     use std::env::temp_dir;
+    use std::io::Write;
+    use std::{collections::HashSet, ffi::OsStr};
 
-    use actix_web::App;
     use actix_http::Request;
+    use actix_web::App;
     use diesel::r2d2::ConnectionManager;
     use jwt_simple::algorithms::RS256PublicKey;
     use r2d2::PooledConnection;
     use reqwest::StatusCode;
 
-    use crate::{make_config, db, models::AclDecision};
+    use crate::{db, make_config, models::AclDecision};
 
     use super::*;
 
     pub async fn make_test_app_state(db_name: &str) -> AppState {
         let pub_str = include_str!("../public.example");
         let db_pool = db::get_db_pool(Some(String::from(db_name)));
-        let app_state = AppState {
+        AppState {
             app_version: String::from("0.1.0"),
             // put the root dir at the same location where the temporary directory will be created
-            root_dir: PathBuf::from(temp_dir()),
+            root_dir: temp_dir(),
             pub_key: RS256PublicKey::from_pem(pub_str).unwrap(),
             db_pool,
-        };
-        app_state
+        }
     }
 
     pub async fn make_test_get_request(uri: &str) -> Request {
         let jwt_str = include_str!("../jwt.example");
-        let req = actix_web::test::TestRequest::get()
+        actix_web::test::TestRequest::get()
             .uri(uri)
             .insert_header((String::from("x-tapis-token"), jwt_str))
-            .to_request();
-        req
+            .to_request()
     }
 
     pub fn make_test_tmp_file_system() -> std::io::Result<tempfile::TempDir> {
@@ -543,7 +540,10 @@ mod test {
         Ok(temp)
     }
 
-    async fn make_acls(base_path: &OsStr, conn: &PooledConnection<ConnectionManager<diesel::SqliteConnection>>) -> std::io::Result<()> {
+    async fn make_acls(
+        base_path: &OsStr,
+        conn: &PooledConnection<ConnectionManager<diesel::SqliteConnection>>,
+    ) -> std::io::Result<()> {
         let base_path = base_path.to_str().map(|s| s.to_string()).unwrap();
         let acl = NewAclJson {
             subject: String::from("tenants@admin"),
@@ -559,8 +559,9 @@ mod test {
             &acl.path,
             &acl.user,
             &acl.decision,
-            &"tester_admin",
-        ).unwrap();
+            "tester_admin",
+        )
+        .unwrap();
 
         let acl = NewAclJson {
             subject: String::from("tenants@admin"),
@@ -576,8 +577,9 @@ mod test {
             &acl.path,
             &acl.user,
             &acl.decision,
-            &"tester_admin",
-        ).unwrap();
+            "tester_admin",
+        )
+        .unwrap();
 
         let acl = NewAclJson {
             subject: String::from("tenants@admin"),
@@ -593,15 +595,16 @@ mod test {
             &acl.path,
             &acl.user,
             &acl.decision,
-            &"tester_admin",
-        ).unwrap();
+            "tester_admin",
+        )
+        .unwrap();
 
         Ok(())
     }
 
     #[actix_rt::test]
     async fn status_should_be_ready() -> std::io::Result<()> {
-        let td = make_test_tmp_file_system()?; 
+        let td = make_test_tmp_file_system()?;
         let db_name = format!("{}/status_should_be_ready.db", td.path().to_string_lossy());
         let app_state = make_test_app_state(&db_name).await;
         let app = actix_web::test::init_service(
@@ -616,7 +619,7 @@ mod test {
 
     #[actix_rt::test]
     async fn files_list_dir() -> std::io::Result<()> {
-        let td = make_test_tmp_file_system()?; 
+        let td = make_test_tmp_file_system()?;
         let t_name = td.path().file_name().unwrap();
         let mut uri = PathBuf::from("/files/list");
         uri.push(&t_name);
@@ -629,10 +632,17 @@ mod test {
         )
         .await;
         let req = make_test_get_request(path_buf_to_str(&uri).unwrap()).await;
-        
+
         let resp: FileListingRsp = actix_web::test::call_and_read_body_json(&app, req).await;
         // one of the files will be the sqlite database file (files_list)_dir.db)
-        let expected_result = HashSet::from([String::from("file_list_dir.db"), String::from("foo.txt"), String::from("bar.txt"), String::from("exam2"), String::from("subdir1"), String::from("subdir2")]);
+        let expected_result = HashSet::from([
+            String::from("file_list_dir.db"),
+            String::from("foo.txt"),
+            String::from("bar.txt"),
+            String::from("exam2"),
+            String::from("subdir1"),
+            String::from("subdir2"),
+        ]);
         let actual_length = &resp.result.len();
         let result: HashSet<String> = resp.result.into_iter().collect();
         assert_eq!(expected_result, result);
@@ -642,7 +652,7 @@ mod test {
 
     #[actix_rt::test]
     async fn acls_list_empty() -> std::io::Result<()> {
-        let td = make_test_tmp_file_system()?; 
+        let td = make_test_tmp_file_system()?;
         let db_name = format!("{}/acls_list_empty.db", td.path().to_string_lossy());
         let app_state = make_test_app_state(&db_name).await;
         let app = actix_web::test::init_service(
@@ -659,7 +669,7 @@ mod test {
 
     #[actix_rt::test]
     async fn acls_list_all() -> std::io::Result<()> {
-        let td = make_test_tmp_file_system()?; 
+        let td = make_test_tmp_file_system()?;
         let t_name = td.path().file_name().unwrap();
         let db_name = format!("{}/acls_list_all.db", td.path().to_string_lossy());
         let app_state = make_test_app_state(&db_name).await;
