@@ -307,7 +307,8 @@ pub fn get_local_listing(full_path: PathBuf) -> Vec<String> {
     // check if full_path is a directory
     if !full_path.is_dir() {
         // assume it is a single path and return it
-        result.push(full_path.to_string_lossy().to_string());
+        // result.push(full_path.to_string_lossy().to_string());
+        result.push(full_path.file_name().unwrap().to_string_lossy().to_string());
         return result;
     }
     let paths = fs::read_dir(full_path).unwrap();

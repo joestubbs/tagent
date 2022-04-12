@@ -6,7 +6,7 @@
 `tagent` provides HTTP APIs for basic file management tasks. The server includes endpoints for listing file paths,
 uploading and downloading files.
 
-An OpenAPI v3 specification is inc+tagent/tagent.dbluded.
+An OpenAPI v3 specification is included.
 
 ## Building the Project
 The project requires a recent version of Rust (e.g., 1.57.0); install using `rustup`. 
@@ -112,7 +112,7 @@ $ curl localhost:8080/files/list/rust/tmp/testup.txt | jq
   "status": "success",
   "version": "0.1.0",
   "result": [
-    "/home/jstubbs/projects/rust/tmp/testup.txt"
+    "testup.txt"
   ]
 }
 ```
