@@ -64,6 +64,7 @@ async fn main() -> std::io::Result<()> {
     let settings = crate::config::TagentConfig::from_sources()?;
     let app_version = String::from(env!("CARGO_PKG_VERSION"));
     let root_dir = settings.root_directory.clone();
+    let db_pool = db::get_db_pool(None);
     info!("tagent version {}", app_version);
     info!("tagent running with root directory: {:?}", &root_dir);
     info!("tagent serving at {}:{}", settings.address, settings.port);
@@ -72,6 +73,7 @@ async fn main() -> std::io::Result<()> {
         app_version,
         root_dir,
         pub_key,
+        db_pool,
     };
 
     let actix_app_state = web::Data::new(app_state);

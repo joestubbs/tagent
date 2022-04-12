@@ -2,23 +2,45 @@ use diesel::prelude::*;
 // use diesel::{Connection};
 use crate::models::{AclAction, AclDecision, DbAcl};
 use chrono::prelude::{DateTime, Utc};
-use dotenv::dotenv;
 use log::debug;
 use std::env;
+use std::fs::File;
+
 use std::time::SystemTime;
 
 use super::models::{NewAcl, NewAclJson};
 use super::representations::AuthCheckError;
 use super::schema::acls;
 
-pub fn establish_connection() -> SqliteConnection {
-    dotenv().ok();
+use diesel::r2d2::ConnectionManager;
+use r2d2::{Pool, PooledConnection};
 
-    // TODO -- do not panic on error
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    SqliteConnection::establish(&database_url)
-        .unwrap_or_else(|_| panic!("Error connecting to {}", database_url))
+
+pub type DbPool = Pool<ConnectionManager<SqliteConnection>>;
+
+/// Create a sqlite connection pool; the db_name attribute is only used in testing; should be an absolute path
+/// to a file to use for the connection pool. This allows for the creation of different connection pools for each test
+/// or set of tests.
+pub fn get_db_pool(db_name: Option<String>) -> DbPool{ 
+    if cfg!(test) {
+        let db_path = &db_name.expect("db_name must be provided");
+        dbg!(&db_path);
+        let _f = File::create(db_path).expect("could not create file at path {}");
+        let mem_db = format!("/{}", db_path);
+        // let mem_db = ":memory:";
+        dbg!(&mem_db);
+        let manager = ConnectionManager::<SqliteConnection>::new(mem_db);
+        let pool = r2d2::Pool::builder().build(manager).expect("Failed to create DB pool.");
+        let _result = diesel_migrations::run_pending_migrations(&pool.get().unwrap());
+        pool
+    } else {
+        let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+        let manager = ConnectionManager::<SqliteConnection>::new(&database_url);
+        r2d2::Pool::builder().build(manager).expect("Failed to create DB pool.")
+    }
+
 }
+
 
 // convert current system time to iso8601
 // cf., https://stackoverflow.com/questions/64146345/how-do-i-convert-a-systemtime-to-iso-8601-in-rust
@@ -29,7 +51,7 @@ fn iso8601(st: &SystemTime) -> String {
 }
 
 pub fn save_acl(
-    conn: &mut SqliteConnection,
+    conn: &PooledConnection<ConnectionManager<diesel::SqliteConnection>>,
     subject: &str,
     action: &AclAction,
     path: &str,
@@ -62,12 +84,12 @@ pub fn save_acl(
         .execute(conn)
 }
 
-pub fn retrieve_all_acls(conn: &mut SqliteConnection) -> Result<Vec<DbAcl>, diesel::result::Error> {
+pub fn retrieve_all_acls(conn: &PooledConnection<ConnectionManager<diesel::SqliteConnection>>,) -> Result<Vec<DbAcl>, diesel::result::Error> {
     acls::dsl::acls.load::<DbAcl>(conn)
 }
 
 pub fn retrieve_acls_for_subject(
-    conn: &mut SqliteConnection,
+    conn: &PooledConnection<ConnectionManager<diesel::SqliteConnection>>,
     sub: &str,
 ) -> Result<Vec<DbAcl>, diesel::result::Error> {
     use crate::schema::acls::subject;
@@ -75,7 +97,7 @@ pub fn retrieve_acls_for_subject(
 }
 
 pub fn retrieve_acls_for_subject_user(
-    conn: &mut SqliteConnection,
+    conn: &PooledConnection<ConnectionManager<diesel::SqliteConnection>>,
     sub: &str,
     usr: &str,
 ) -> Result<Vec<DbAcl>, diesel::result::Error> {
@@ -88,14 +110,14 @@ pub fn retrieve_acls_for_subject_user(
 }
 
 pub fn retrieve_acl_by_id(
-    conn: &mut SqliteConnection,
+    conn: &PooledConnection<ConnectionManager<diesel::SqliteConnection>>,
     id: i32,
 ) -> Result<DbAcl, diesel::result::Error> {
     acls::dsl::acls.find(id).first(conn)
 }
 
 pub fn delete_acl_from_db_by_id(
-    conn: &mut SqliteConnection,
+    conn: &PooledConnection<ConnectionManager<diesel::SqliteConnection>>,
     acl_id: i32,
 ) -> Result<usize, diesel::result::Error> {
     use crate::schema::acls::id;
@@ -103,7 +125,7 @@ pub fn delete_acl_from_db_by_id(
 }
 
 pub fn update_acl_in_db_by_id(
-    conn: &mut SqliteConnection,
+    conn: &PooledConnection<ConnectionManager<diesel::SqliteConnection>>,
     acl_id: i32,
     new_acl: &NewAclJson,
     new_subject: &str,
@@ -206,7 +228,7 @@ pub fn check_acl_for_match(
 }
 
 pub fn is_authz_db(
-    conn: &mut SqliteConnection,
+    conn: &PooledConnection<ConnectionManager<diesel::SqliteConnection>>,
     sub: &str,
     usr: &str,
     pth: &str,

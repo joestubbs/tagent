@@ -1,14 +1,17 @@
+use crate::db::DbPool;
+
 use super::models::DbAcl;
 use actix_web::{HttpResponse, ResponseError};
 // use glob;
 use jwt_simple::algorithms::RS256PublicKey;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use std::{fmt, path::PathBuf};
 
 pub struct AppState {
     pub app_version: String,
     pub root_dir: PathBuf,
     pub pub_key: RS256PublicKey,
+    pub db_pool: DbPool,
 }
 
 // Ready Endpoint ----------
@@ -135,6 +138,13 @@ impl From<AuthCheckError> for TagentError {
     }
 }
 
+use r2d2::Error;
+impl From<Error> for TagentError {
+    fn from(error: Error) -> Self {
+        TagentError::new_with_version(format!("Unable to get database connection; details: {}", error))
+    }
+}
+
 impl fmt::Display for TagentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Error: {}", self.message)
@@ -168,7 +178,7 @@ pub struct AclStringRsp {
 }
 
 /// A representation of an ACL that can be used in JSON responses that contain an ACL result or a Vector of ACLs
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Acl {
     pub id: i32,
     pub subject: String,
@@ -196,7 +206,7 @@ impl Acl {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AclListingRsp {
     pub message: String,
     pub status: String,
@@ -204,7 +214,7 @@ pub struct AclListingRsp {
     pub result: Vec<Acl>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AclByIdRsp {
     pub message: String,
     pub status: String,
@@ -214,7 +224,7 @@ pub struct AclByIdRsp {
 
 // Files Endpoints ----------
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct FileListingRsp {
     pub message: String,
     pub status: String,
