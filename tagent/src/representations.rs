@@ -240,7 +240,6 @@ pub struct AclAuthzCheckRsp {
     pub version: String,
 }
 
-
 // Files Endpoints ----------
 
 #[derive(Serialize, Deserialize)]

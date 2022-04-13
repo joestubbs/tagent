@@ -154,8 +154,6 @@ pub fn update_acl_in_db_by_id(
         .execute(conn)
 }
 
-
-
 /// Checks whether a field with a wildcard character matches another field value
 pub fn check_acl_glob_for_match(acl_field: &str, field: &str) -> Result<bool, glob::PatternError> {
     let options = glob::MatchOptions {
@@ -233,8 +231,6 @@ pub fn check_acl_for_match(
     Ok(true)
 }
 
-
-
 /// check whether a subject is authroized for an action on a path as a user.
 pub fn is_authz_db(
     conn: &PooledConnection<ConnectionManager<diesel::SqliteConnection>>,
@@ -254,7 +250,10 @@ pub fn is_authz_db(
         .load::<DbAcl>(conn)?;
     for acl in deny_acls {
         if check_acl_for_match(sub, usr, pth, &act.to_string(), &acl)? {
-            return Ok(AuthAnswer{allowed: false, acl_id: Some(acl.id)});
+            return Ok(AuthAnswer {
+                allowed: false,
+                acl_id: Some(acl.id),
+            });
         }
     }
     // check for any matching ACL with an Allow decision
@@ -265,10 +264,16 @@ pub fn is_authz_db(
         .load::<DbAcl>(conn)?;
     for acl in allow_acls {
         if check_acl_for_match(sub, usr, pth, &act.to_string(), &acl)? {
-            return Ok(AuthAnswer{allowed: true, acl_id: Some(acl.id)});
+            return Ok(AuthAnswer {
+                allowed: true,
+                acl_id: Some(acl.id),
+            });
         }
     }
     debug!("no ACL matched; returning default decision (false)");
     // if no ACL matched then the action is not authorized by default
-    Ok(AuthAnswer{allowed: false, acl_id: None})
+    Ok(AuthAnswer {
+        allowed: false,
+        acl_id: None,
+    })
 }

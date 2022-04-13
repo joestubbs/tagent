@@ -278,7 +278,6 @@ pub async fn is_authz_subject_user_action_path(
     let conn = &app_state.get_ref().db_pool.get()?;
     let result = is_authz_db(conn, sub, usr, &check_path, act)?;
 
-
     let rsp = AclAuthzCheckRsp {
         status: String::from("success"),
         message: "Result of authz check returned".to_string(),
@@ -701,10 +700,13 @@ mod test {
         )
         .await;
         let _ = make_acls(t_name, &conn).await;
-        let uri = format!("/acls/isauthz/tenants@admin/self/Write/{}/subdir2/bam.zip", t_name.to_string_lossy());
+        let uri = format!(
+            "/acls/isauthz/tenants@admin/self/Write/{}/subdir2/bam.zip",
+            t_name.to_string_lossy()
+        );
         let req = make_test_get_request(&uri).await;
         let resp: AclAuthzCheckRsp = actix_web::test::call_and_read_body_json(&app, req).await;
-        assert_eq!(resp.result.allowed, true);
+        assert!(resp.result.allowed);
         assert_ne!(resp.result.acl_id, None);
         Ok(())
     }
@@ -713,7 +715,10 @@ mod test {
     async fn acls_allow_exact_action_impl() -> std::io::Result<()> {
         let td = make_test_tmp_file_system()?;
         let t_name = td.path().file_name().unwrap();
-        let db_name = format!("{}/acls_allow_exact_action_impl.db", td.path().to_string_lossy());
+        let db_name = format!(
+            "{}/acls_allow_exact_action_impl.db",
+            td.path().to_string_lossy()
+        );
         let app_state = make_test_app_state(&db_name).await;
         let conn = app_state.db_pool.get().unwrap();
         let app = actix_web::test::init_service(
@@ -721,20 +726,25 @@ mod test {
         )
         .await;
         let _ = make_acls(t_name, &conn).await;
-        let uri = format!("/acls/isauthz/tenants@admin/self/Read/{}/subdir2/bam.zip", t_name.to_string_lossy());
+        let uri = format!(
+            "/acls/isauthz/tenants@admin/self/Read/{}/subdir2/bam.zip",
+            t_name.to_string_lossy()
+        );
         let req = make_test_get_request(&uri).await;
         let resp: AclAuthzCheckRsp = actix_web::test::call_and_read_body_json(&app, req).await;
-        assert_eq!(resp.result.allowed, true);
+        assert!(resp.result.allowed);
         assert_ne!(resp.result.acl_id, None);
         Ok(())
     }
-
 
     #[actix_rt::test]
     async fn acls_default_decision_deny() -> std::io::Result<()> {
         let td = make_test_tmp_file_system()?;
         let t_name = td.path().file_name().unwrap();
-        let db_name = format!("{}/acls_default_decision_deny.db", td.path().to_string_lossy());
+        let db_name = format!(
+            "{}/acls_default_decision_deny.db",
+            td.path().to_string_lossy()
+        );
         let app_state = make_test_app_state(&db_name).await;
         let conn = app_state.db_pool.get().unwrap();
         let app = actix_web::test::init_service(
@@ -742,16 +752,19 @@ mod test {
         )
         .await;
         let _ = make_acls(t_name, &conn).await;
-        // we choose a path with no matching ACL, so the decision should be deny. 
-        let uri = format!("/acls/isauthz/tenants@admin/self/Write/{}/levitation.mp3", t_name.to_string_lossy());
+        // we choose a path with no matching ACL, so the decision should be deny.
+        let uri = format!(
+            "/acls/isauthz/tenants@admin/self/Write/{}/levitation.mp3",
+            t_name.to_string_lossy()
+        );
         let req = make_test_get_request(&uri).await;
         let resp: AclAuthzCheckRsp = actix_web::test::call_and_read_body_json(&app, req).await;
-        assert_eq!(resp.result.allowed, false);
-        // should be no matching ACL 
+        assert!(!resp.result.allowed);
+        // should be no matching ACL
         assert_eq!(resp.result.acl_id, None);
         Ok(())
     }
-   
+
     #[actix_rt::test]
     async fn acls_allow_glob() -> std::io::Result<()> {
         let td = make_test_tmp_file_system()?;
@@ -764,10 +777,13 @@ mod test {
         )
         .await;
         let _ = make_acls(t_name, &conn).await;
-        let uri = format!("/acls/isauthz/tenants@admin/self/Read/{}/foo.txt", t_name.to_string_lossy());
+        let uri = format!(
+            "/acls/isauthz/tenants@admin/self/Read/{}/foo.txt",
+            t_name.to_string_lossy()
+        );
         let req = make_test_get_request(&uri).await;
         let resp: AclAuthzCheckRsp = actix_web::test::call_and_read_body_json(&app, req).await;
-        assert_eq!(resp.result.allowed, true);
+        assert!(resp.result.allowed);
         assert_ne!(resp.result.acl_id, None);
         Ok(())
     }
@@ -784,12 +800,15 @@ mod test {
         )
         .await;
         let _ = make_acls(t_name, &conn).await;
-        // note: this test passes because of how we have set the require_literal_separator: false, 
+        // note: this test passes because of how we have set the require_literal_separator: false,
         // see notes in  the db::check_acl_glob_for_match() function.
-        let uri = format!("/acls/isauthz/tenants@admin/self/Read/{}/subdir1/sub2/sub3/foo.txt", t_name.to_string_lossy());
+        let uri = format!(
+            "/acls/isauthz/tenants@admin/self/Read/{}/subdir1/sub2/sub3/foo.txt",
+            t_name.to_string_lossy()
+        );
         let req = make_test_get_request(&uri).await;
         let resp: AclAuthzCheckRsp = actix_web::test::call_and_read_body_json(&app, req).await;
-        assert_eq!(resp.result.allowed, true);
+        assert!(resp.result.allowed);
         assert_ne!(resp.result.acl_id, None);
         Ok(())
     }
@@ -806,13 +825,16 @@ mod test {
         )
         .await;
         let _ = make_acls(t_name, &conn).await;
-        let uri = format!("/acls/isauthz/tenants@admin/self/Write/{}/exam.123", t_name.to_string_lossy());
+        let uri = format!(
+            "/acls/isauthz/tenants@admin/self/Write/{}/exam.123",
+            t_name.to_string_lossy()
+        );
         let req = make_test_get_request(&uri).await;
         let resp: AclAuthzCheckRsp = actix_web::test::call_and_read_body_json(&app, req).await;
-        assert_eq!(resp.result.allowed, false);
+        assert!(!resp.result.allowed);
         assert_ne!(resp.result.acl_id, None);
         Ok(())
-    }    
+    }
 
     #[actix_rt::test]
     async fn acls_deny_glob_subdirs() -> std::io::Result<()> {
@@ -828,21 +850,27 @@ mod test {
         let _ = make_acls(t_name, &conn).await;
         // note that in this case  the require_literal_separator: false does not actually apply; the glob in question (exam*)
         // requires a match at the beginning of the string.
-        // *however*, this authz check is still false because there is *no* matching ACL; thus, the system uses the 
-        // default decision. 
-        let uri = format!("/acls/isauthz/tenants@admin/self/Write/{}/dir1/dir2/exam.123", t_name.to_string_lossy());
+        // *however*, this authz check is still false because there is *no* matching ACL; thus, the system uses the
+        // default decision.
+        let uri = format!(
+            "/acls/isauthz/tenants@admin/self/Write/{}/dir1/dir2/exam.123",
+            t_name.to_string_lossy()
+        );
         let req = make_test_get_request(&uri).await;
         let resp: AclAuthzCheckRsp = actix_web::test::call_and_read_body_json(&app, req).await;
-        assert_eq!(resp.result.allowed, false);
+        assert!(!resp.result.allowed);
         // this assert verifies that no ACL matched and the system used the default decision.
         assert_eq!(resp.result.acl_id, None);
         Ok(())
-    } 
+    }
     #[actix_rt::test]
     async fn acls_deny_precedence_over_allow() -> std::io::Result<()> {
         let td = make_test_tmp_file_system()?;
         let t_name = td.path().file_name().unwrap();
-        let db_name = format!("{}/acls_deny_precedence_over_allow.db", td.path().to_string_lossy());
+        let db_name = format!(
+            "{}/acls_deny_precedence_over_allow.db",
+            td.path().to_string_lossy()
+        );
         let app_state = make_test_app_state(&db_name).await;
         let conn = app_state.db_pool.get().unwrap();
         let app = actix_web::test::init_service(
@@ -850,15 +878,16 @@ mod test {
         )
         .await;
         let _ = make_acls(t_name, &conn).await;
-        // this path matches BOTH an allow ACL and a deny ACL, but deny takes precedence... 
-        let uri = format!("/acls/isauthz/tenants@admin/self/Write/{}/exam.txt", t_name.to_string_lossy());
+        // this path matches BOTH an allow ACL and a deny ACL, but deny takes precedence...
+        let uri = format!(
+            "/acls/isauthz/tenants@admin/self/Write/{}/exam.txt",
+            t_name.to_string_lossy()
+        );
         let req = make_test_get_request(&uri).await;
         let resp: AclAuthzCheckRsp = actix_web::test::call_and_read_body_json(&app, req).await;
         dbg!(&resp.result);
-        assert_eq!(resp.result.allowed, false);
+        assert!(!resp.result.allowed);
         assert_ne!(resp.result.acl_id, None);
         Ok(())
-    }    
-
-
+    }
 }
