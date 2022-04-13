@@ -172,7 +172,7 @@ impl ResponseError for TagentError {
 // ACL Endpoints ----------
 
 /// Respones for ACL endpoints that return a string result
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct AclStringRsp {
     pub message: String,
     pub status: String,
@@ -224,6 +224,22 @@ pub struct AclByIdRsp {
     pub version: String,
     pub result: Acl,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AuthAnswer {
+    pub allowed: bool,
+    pub acl_id: Option<i32>,
+}
+
+/// Respones for ACL endpoints that return a string result
+#[derive(Serialize, Deserialize)]
+pub struct AclAuthzCheckRsp {
+    pub message: String,
+    pub status: String,
+    pub result: AuthAnswer,
+    pub version: String,
+}
+
 
 // Files Endpoints ----------
 

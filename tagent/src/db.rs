@@ -1,6 +1,7 @@
 use diesel::prelude::*;
 // use diesel::{Connection};
 use crate::models::{AclAction, AclDecision, DbAcl};
+use crate::representations::AuthAnswer;
 use chrono::prelude::{DateTime, Utc};
 use log::debug;
 use std::env;
@@ -153,6 +154,8 @@ pub fn update_acl_in_db_by_id(
         .execute(conn)
 }
 
+
+
 /// Checks whether a field with a wildcard character matches another field value
 pub fn check_acl_glob_for_match(acl_field: &str, field: &str) -> Result<bool, glob::PatternError> {
     let options = glob::MatchOptions {
@@ -230,13 +233,16 @@ pub fn check_acl_for_match(
     Ok(true)
 }
 
+
+
+/// check whether a subject is authroized for an action on a path as a user.
 pub fn is_authz_db(
     conn: &PooledConnection<ConnectionManager<diesel::SqliteConnection>>,
     sub: &str,
     usr: &str,
     pth: &str,
     act: &AclAction,
-) -> Result<bool, AuthCheckError> {
+) -> Result<AuthAnswer, AuthCheckError> {
     use crate::schema::acls::decision;
     use crate::schema::acls::subject;
 
@@ -248,7 +254,7 @@ pub fn is_authz_db(
         .load::<DbAcl>(conn)?;
     for acl in deny_acls {
         if check_acl_for_match(sub, usr, pth, &act.to_string(), &acl)? {
-            return Ok(false);
+            return Ok(AuthAnswer{allowed: false, acl_id: Some(acl.id)});
         }
     }
     // check for any matching ACL with an Allow decision
@@ -259,10 +265,10 @@ pub fn is_authz_db(
         .load::<DbAcl>(conn)?;
     for acl in allow_acls {
         if check_acl_for_match(sub, usr, pth, &act.to_string(), &acl)? {
-            return Ok(true);
+            return Ok(AuthAnswer{allowed: true, acl_id: Some(acl.id)});
         }
     }
     debug!("no ACL matched; returning default decision (false)");
     // if no ACL matched then the action is not authorized by default
-    Ok(false)
+    Ok(AuthAnswer{allowed: false, acl_id: None})
 }
