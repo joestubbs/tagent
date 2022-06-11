@@ -1,9 +1,10 @@
 use crate::schema::*;
+use async_std::path::{PathBuf, Path};
 use diesel::sql_types::Text;
 use diesel::Queryable;
 // use glob;
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::{fmt, ffi::OsStr, collections::HashMap};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum AclAction {
@@ -108,4 +109,13 @@ impl diesel::Expression for AclAction {
 
 impl diesel::Expression for AclDecision {
     type SqlType = Text;
+}
+
+// struct representing a user-supplied JSON object describing a new command to execute
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NewCommandJson {
+    pub program: String, 
+    pub args: Vec<String>,
+    pub envs: HashMap<String, String>, 
+    pub current_dir: String,
 }

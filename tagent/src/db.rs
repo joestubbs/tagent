@@ -27,7 +27,6 @@ pub fn get_db_pool(db_name: Option<String>) -> DbPool {
         dbg!(&db_path);
         let _f = File::create(db_path).expect("could not create file at path {}");
         let mem_db = format!("/{}", db_path);
-        // let mem_db = ":memory:";
         dbg!(&mem_db);
         let manager = ConnectionManager::<SqliteConnection>::new(mem_db);
         let pool = r2d2::Pool::builder()

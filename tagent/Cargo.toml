@@ -30,6 +30,9 @@ dirs = "4.0.0"
 glob = "0.3"
 regex = "1"
 r2d2 = "0.8.9"
+simple_jobs = { version = "0.2.1", features = ["diesel_jobs"] }
+tokio = "1.18.2"
+
 
 [dev-dependencies]
 actix-rt = "2.6.0"

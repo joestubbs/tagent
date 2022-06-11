@@ -407,5 +407,34 @@ curl -H "x-tapis-token: $jwt" localhost:8080/acls/3 -X DELETE
 }
 ```
 
+## Developing `tagent`
 
+This section discusses working on the `tagent` code base.  
 
+### Database: Initial Setup
+The `tagent` server utilizes sqlite for persistence and the Diesel crate for automating interactions with the database. sqlite persists all data in the database to a single file, and this must be set up on each development machine.
+
+To create the database file, `tagent.db`, run
+
+```
+$ diesel setup
+$ diesel migrations run
+```
+
+These commands should have created a new file, `tagent.db` in the `tagent` directory and added the tables. Use your favorite sqlite db client (we like the alexcvzz sqlite [extension](https://marketplace.visualstudio.com/items?itemName=alexcvzz.vscode-sqlite) for vscode) to inspect the database and ensure the structure is present.
+
+### Modifying the DB Schema
+
+To make a change to the database schema, run the following command:
+
+```
+$ diesel migration generate <some_name>
+```
+where <some_name> describes the changes being made to the schema (e.g., "create_acls" added a new acls table to support the acls endpoints). This command will create a new directory with empty files `up.sql` and `down.sql` inside the `tagents/migrations` folder. Fill in the `up.sql` and `down.sql` with the sql needed for your schema change.
+
+Once you have added the sql code, run 
+
+```
+$ diesel migration run
+```
+to apply the schema changes. 

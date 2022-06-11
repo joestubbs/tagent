@@ -5,7 +5,8 @@ use actix_web::{HttpResponse, ResponseError};
 // use glob;
 use jwt_simple::algorithms::RS256PublicKey;
 use serde::{Deserialize, Serialize};
-use std::{fmt, path::PathBuf};
+use uuid::Uuid;
+use std::{fmt, path::PathBuf, string::FromUtf8Error};
 
 pub struct AppState {
     pub app_version: String,
@@ -61,7 +62,7 @@ pub struct ErrorRsp {
 }
 
 /// Primary error type used by hanlders. It can convert to a actix_web::ResponseError
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct TagentError {
     message: String,
     version: String,
@@ -133,6 +134,15 @@ impl From<AuthCheckError> for TagentError {
     fn from(error: AuthCheckError) -> Self {
         TagentError::new_with_version(format!(
             "Unable to calculate auth check; details: {}",
+            error
+        ))
+    }
+}
+
+impl From<FromUtf8Error> for TagentError {
+    fn from(error: FromUtf8Error) -> Self {
+        TagentError::new_with_version(format!(
+            "Unable to convert bytes array to utf-8 string; details: {}",
             error
         ))
     }
@@ -256,4 +266,18 @@ pub struct FileUploadRsp {
     pub status: String,
     pub version: String,
     pub result: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct NewCommandResult {
+    pub job_id: Uuid,
+
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CreateCommandRsp {
+    pub message: String,
+    pub status: String,
+    pub version: String,
+    pub result: NewCommandResult,
 }

@@ -15,6 +15,7 @@ mod handlers;
 mod models;
 mod representations;
 mod schema;
+mod jobs;
 
 fn make_config(app_data: web::Data<representations::AppState>) -> impl FnOnce(&mut ServiceConfig) {
     |cfg: &mut ServiceConfig| {

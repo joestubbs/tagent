@@ -1,6 +1,9 @@
 use actix_files::NamedFile;
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder, Result};
 use log::debug;
+use simple_jobs::Job;
+use simple_jobs::sqlite_job::DieselSqliteJob;
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -10,8 +13,9 @@ use futures::{StreamExt, TryStreamExt};
 
 use uuid::Uuid;
 
-use crate::models::AclAction;
-use crate::representations::AclAuthzCheckRsp;
+use crate::jobs::run_command;
+use crate::models::{AclAction, NewCommandJson};
+use crate::representations::{AclAuthzCheckRsp, CreateCommandRsp, NewCommandResult};
 
 use super::auth::get_subject_of_request;
 use super::db::{
@@ -464,6 +468,69 @@ pub async fn post_file_contents_path(
 
     Ok(web::Json(r))
 }
+
+
+// commands endpoints
+
+#[post("/commands")]
+pub async fn create_command(
+    _req: HttpRequest,
+    app_state: web::Data<AppState>,
+    command: web::Json<NewCommandJson>,
+) -> Result<impl Responder, TagentError> {
+    let version = &app_state.get_ref().app_version;
+    let pub_key = &app_state.get_ref().pub_key;
+    debug!("processing request to POST /commands");
+    let subject = get_subject_of_request(_req, pub_key).await?;
+    let root_dir = &app_state.get_ref().root_dir;
+    let mut full_current_dir = PathBuf::from(root_dir);
+    full_current_dir.push(&command.current_dir);
+    let mut error: bool = false;
+    let mut message = String::from("There was an error");
+    if !full_current_dir.exists() {
+        message = format!(
+            "Invalid path; path {:#?} does not exist",
+            path_buf_to_str(&full_current_dir)
+        );
+        error = true;
+    };
+    if !full_current_dir.is_dir() {
+        message = format!("Invalid path; path {:#?} must be a directory", full_current_dir);
+        error = true;
+    };
+    if error {
+        return Err(TagentError::new(message, version.to_string()));
+    };
+    
+    let jb: DieselSqliteJob<String, TagentError> = DieselSqliteJob::new(&app_state.get_ref().db_pool);
+        // let mut args = Vec::<PathBuf>::new();
+        // for arg in command.args {
+        //     args.push(PathBuf::from(&arg));
+        // };
+
+    let id = jb.submit( |id, job | async move {
+        // let program = command.program.clone();
+        // let args: Vec<PathBuf> = command.args.into_iter().map(|a| PathBuf::from(&a)).collect();
+        // let envs = command.envs;
+        // let out = run_command(OsStr::new(&program), &args, &envs, &full_current_dir.as_os_str()).await?;
+        // Ok(out)
+        Ok("hi".to_string())
+    })?;
+
+    let result = NewCommandResult {
+        job_id: id,
+    };
+
+    let rsp = CreateCommandRsp {
+        status: String::from("success"),
+        message: format!("Command submitted successfully."),
+        result,
+        version: version.to_string(),
+    };
+
+    Ok(web::Json(rsp))
+}
+
 
 #[cfg(test)]
 mod test {
